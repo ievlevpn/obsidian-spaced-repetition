@@ -1,5 +1,9 @@
 import { ClozeCrafter, IClozeFormatter } from "clozecraft";
 
+import {
+    containsMathCloze,
+    expandMathClozes,
+} from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
 import { findLineIndexOfSearchStringIgnoringWs } from "src/utils/strings";
@@ -94,6 +98,12 @@ class QuestionTypeMultiLineReversed implements IQuestionTypeHandler {
 
 class QuestionTypeCloze implements IQuestionTypeHandler {
     expand(questionText: string, settings: SRSettings): CardFrontBack[] {
+        // `\cloze{answer}{hint}` is parsed directly (collision-free LaTeX macro); everything else
+        // goes through clozecraft's configurable `{{...}}` / `==...==` patterns.
+        if (containsMathCloze(questionText)) {
+            return expandMathClozes(questionText).map((c) => new CardFrontBack(c.front, c.back));
+        }
+
         const clozecrafter = new ClozeCrafter(settings.clozePatterns);
         const clozeNote = clozecrafter.createClozeNote(questionText);
 

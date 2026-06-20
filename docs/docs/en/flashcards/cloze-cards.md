@@ -63,6 +63,54 @@ The first female ==prime minister== of Australia was ==Julia Gillard==
 These two cards are considered sibling cards. See [sibling cards](flashcards-overview.md#sibling-cards) regarding the
 [Bury sibling cards until the next day](../user-options.md#flashcard-review) scheduling option.
 
+## Clozes in Math (LaTeX)
+
+Inside inline (`$...$`) or block (`$$...$$`) math, mark a cloze deletion with the `\cloze{answer}{hint}` macro.
+The other cloze delimiters are unsuitable inside math: `==` and `**` change the LaTeX rendering, and `{{...}}` collides with LaTeX's own use of braces.
+
+The hint is the second argument — leave it empty (`{}`) when you don't need one.
+
+When you **read** a note, `\cloze{answer}{hint}` renders as just the `answer`, so the formula looks normal.
+When you **review**, the answer is hidden on the front (shown as `[hint]`, or `[…]` when no hint is given) and revealed on the back.
+
+For instance, the following note:
+
+```
+$$
+\cloze{c^2}{} = \cloze{a^2 + b^2}{Pythagoras}
+$$
+```
+
+Generates two sibling cards, with the following fronts:
+
+!!! note ""
+
+    <div class="grid" markdown>
+
+    !!! tip "Card 1 Initial View"
+
+        $$ [\ldots] = a^2 + b^2 $$
+
+    !!! tip "Card 2 Initial View"
+
+        $$ c^2 = [\text{Pythagoras}] $$
+
+    </div>
+
+!!! tip "After `Show Answer` Clicked (same for both cards)"
+
+    $$ c^2 = a^2 + b^2 $$
+
+The answer may contain braces, fractions, roots, and other nested LaTeX — for example `\cloze{\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}}{}` — and is parsed correctly.
+
+!!! note
+
+    `\cloze` works inside math regardless of the cloze patterns configured in your settings. It does not need to be added to [Custom Cloze Patterns](#custom-cloze-patterns).
+
+!!! warning
+
+    A note that is already open when the plugin loads may show `\cloze` unrendered until its view is rebuilt: switch to another note and back, or reopen the note. Notes opened afterwards render correctly straight away.
+
 ## Cloze Types
 
 ### Simplified Clozes
