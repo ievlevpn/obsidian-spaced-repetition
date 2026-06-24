@@ -87,4 +87,14 @@ describe("expandMathClozes", () => {
         // No second {...} -> not a valid cloze -> no cards produced.
         expect(expandMathClozes("$\\cloze{a}$")).toEqual([]);
     });
+
+    test("\\clozeXYZ (command continues with letters) is not a cloze", () => {
+        // \clozenot is a different macro; the letter boundary rejects it.
+        expect(expandMathClozes("$\\clozenot{a}{b}$")).toEqual([]);
+    });
+
+    test("an unclosed brace group produces no card", () => {
+        // Second arg opens but never closes -> readBraceGroup returns null.
+        expect(expandMathClozes("$\\cloze{a}{b$")).toEqual([]);
+    });
 });
