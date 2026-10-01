@@ -107,6 +107,16 @@ The answer may contain braces, fractions, roots, and other nested LaTeX — for 
 
     `\cloze` works inside math regardless of the cloze patterns configured in your settings. It does not need to be added to [Custom Cloze Patterns](#custom-cloze-patterns).
 
+!!! note
+
+    A note may mix `\cloze` with the other cloze syntaxes. Each deletion becomes its own card, and on every card the deletions from the *other* syntax are shown as their plain answer:
+
+    ```
+    $E = \cloze{mc^2}{}$ was published in ==1905==
+    ```
+
+    gives two cards — one hiding `mc^2`, one hiding `1905`.
+
 !!! warning
 
     A note that is already open when the plugin loads may show `\cloze` unrendered until its view is rebuilt: switch to another note and back, or reopen the note. Notes opened afterwards render correctly straight away.

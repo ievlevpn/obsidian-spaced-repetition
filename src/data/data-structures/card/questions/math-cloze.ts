@@ -33,6 +33,27 @@ export function containsMathCloze(text: string): boolean {
  * @returns One `{ front, back }` per cloze; on each card the target cloze is occluded on the
  *     front and revealed (highlighted) on the back, while the other clozes show their answer
  */
+/**
+ * Replace every `\cloze{answer}{hint}` with its bare `answer`.
+ *
+ * Used when expanding the *other* cloze syntax in the same block: a `{{...}}` card should show
+ * the math clozes as ordinary formula text rather than as `\cloze` markup.
+ *
+ * @param text - The card text
+ * @returns `text` with every `\cloze` macro collapsed to its answer
+ */
+export function stripMathClozes(text: string): string {
+    const clozes = findMathClozes(text);
+    if (clozes.length === 0) return text;
+    let out = "";
+    let prev = 0;
+    for (const cloze of clozes) {
+        out += text.slice(prev, cloze.start) + cloze.answer;
+        prev = cloze.end;
+    }
+    return out + text.slice(prev);
+}
+
 export function expandMathClozes(text: string): { front: string; back: string }[] {
     const clozes = findMathClozes(text);
     const cards: { front: string; back: string }[] = [];

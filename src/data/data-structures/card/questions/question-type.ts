@@ -3,6 +3,7 @@ import { ClozeCrafter, IClozeFormatter } from "clozecraft";
 import {
     containsMathCloze,
     expandMathClozes,
+    stripMathClozes,
 } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
@@ -98,14 +99,23 @@ class QuestionTypeMultiLineReversed implements IQuestionTypeHandler {
 
 class QuestionTypeCloze implements IQuestionTypeHandler {
     expand(questionText: string, settings: SRSettings): CardFrontBack[] {
-        // `\cloze{answer}{hint}` is parsed directly (collision-free LaTeX macro); everything else
-        // goes through clozecraft's configurable `{{...}}` / `==...==` patterns.
+        // Two independent cloze syntaxes can appear in the same block: the `\cloze{answer}{hint}`
+        // LaTeX macro and clozecraft's configurable `{{...}}` / `==...==` patterns. Expand both and
+        // concatenate, so a block that mixes them yields a card per deletion rather than dropping
+        // one syntax. Each pass sees the *other* syntax already collapsed to its plain answer, so
+        // every card reads as ordinary prose/formula apart from its own deletion.
+        const clozecrafter = new ClozeCrafter(settings.clozePatterns);
+        const mathCards: CardFrontBack[] = [];
+
         if (containsMathCloze(questionText)) {
-            return expandMathClozes(questionText).map((c) => new CardFrontBack(c.front, c.back));
+            mathCards.push(
+                ...expandMathClozes(
+                    this.flattenClozecraftDeletions(questionText, clozecrafter),
+                ).map((c) => new CardFrontBack(c.front, c.back)),
+            );
         }
 
-        const clozecrafter = new ClozeCrafter(settings.clozePatterns);
-        const clozeNote = clozecrafter.createClozeNote(questionText);
+        const clozeNote = clozecrafter.createClozeNote(stripMathClozes(questionText));
 
         // Determine which question formatter to use based on settings (Cloze patterns as inputs or not).
         const clozeFormatter = settings.convertClozePatternsToInputs
@@ -113,7 +123,7 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
             : new QuestionTypeClozeFormatter();
 
         let front: string, back: string;
-        const result: CardFrontBack[] = [];
+        const result: CardFrontBack[] = [...mathCards];
         if (clozeNote === null) return result;
 
         for (let i = 0; i < clozeNote.numCards; i++) {
@@ -123,6 +133,38 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
         }
 
         return result;
+    }
+
+    /**
+     * Collapse every clozecraft deletion in `text` to its plain answer.
+     *
+     * `getCardFront` already renders non-target deletions as their bare answer, so asking for
+     * card 0 with a formatter that also renders the target plainly yields the fully flattened
+     * text. Returns `text` unchanged when it holds no clozecraft deletions.
+     *
+     * @param text - The card text
+     * @param clozecrafter - Crafter configured with the user's cloze patterns
+     * @returns `text` with every `{{...}}` / `==...==` deletion replaced by its answer
+     */
+    private flattenClozecraftDeletions(text: string, clozecrafter: ClozeCrafter): string {
+        const note = clozecrafter.createClozeNote(text);
+        if (note === null || note.numCards === 0) return text;
+        return note.getCardFront(0, new PlainClozeFormatter());
+    }
+}
+
+/** Renders every cloze deletion as its plain answer, for flattening one syntax while expanding the other. */
+class PlainClozeFormatter implements IClozeFormatter {
+    asking(answer?: string, _hint?: string): string {
+        return answer ?? "";
+    }
+
+    showingAnswer(answer: string, _hint?: string): string {
+        return answer;
+    }
+
+    hiding(answer?: string, _hint?: string): string {
+        return answer ?? "";
     }
 }
 

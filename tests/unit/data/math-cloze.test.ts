@@ -1,6 +1,7 @@
 import {
     containsMathCloze,
     expandMathClozes,
+    stripMathClozes,
 } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 import {
@@ -96,5 +97,49 @@ describe("expandMathClozes", () => {
     test("an unclosed brace group produces no card", () => {
         // Second arg opens but never closes -> readBraceGroup returns null.
         expect(expandMathClozes("$\\cloze{a}{b$")).toEqual([]);
+    });
+});
+
+describe("stripMathClozes", () => {
+    test.each([
+        ["$x = \\cloze{a}{h}$", "$x = a$"],
+        ["$\\cloze{a}{} + \\cloze{b}{}$", "$a + b$"],
+        ["$\\cloze{\\frac{1}{2}}{half}$", "$\\frac{1}{2}$"],
+        ["no macro here", "no macro here"],
+        ["$\\cloze{a}$", "$\\cloze{a}$"], // malformed: left untouched
+    ])("%s -> %s", (text, expected) => {
+        expect(stripMathClozes(text)).toBe(expected);
+    });
+});
+
+describe("a block mixing \\cloze with clozecraft deletions", () => {
+    // Regression: the math path used to return early, so `==...==` / `{{...}}` deletions sharing a
+    // block with a \cloze macro produced no cards at all.
+    test("yields one card per deletion, from both syntaxes", () => {
+        expect(expand("$E = \\cloze{mc^2}{}$ was published in ==1905==")).toHaveLength(2);
+    });
+
+    test("the math card shows the text deletion as its plain answer", () => {
+        const [mathCard] = expand("$E = \\cloze{mc^2}{}$ was published in ==1905==");
+        expect(mathCard.front).toBe("$E = \\color{#2196f3}{[\\ldots]}$ was published in 1905");
+        expect(mathCard.back).toBe("$E = \\color{#2196f3}{mc^2}$ was published in 1905");
+    });
+
+    test("the text card shows the \\cloze as its plain answer", () => {
+        const [, textCard] = expand("$E = \\cloze{mc^2}{}$ was published in ==1905==");
+        expect(textCard.front).toBe(
+            "$E = mc^2$ was published in <span style='color:#2196f3'>[...]</span>",
+        );
+        expect(textCard.back).toBe(
+            "$E = mc^2$ was published in <span style='color:#2196f3'>1905</span>",
+        );
+    });
+
+    test("several of each syntax in one block", () => {
+        expect(expand("$\\cloze{a}{} + \\cloze{b}{}$ with ==c== and ==d==")).toHaveLength(4);
+    });
+
+    test("a block with only clozecraft deletions is untouched by the math path", () => {
+        expect(expand("published in ==1905== by ==Einstein==")).toHaveLength(2);
     });
 });
