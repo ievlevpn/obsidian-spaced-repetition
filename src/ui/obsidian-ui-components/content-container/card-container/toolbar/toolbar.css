@@ -136,3 +136,9 @@
         display: none;
     }
 }
+
+/* Keep Skip visible on phones and narrow mobile panes: one tap instead of digging through
+   the overflow menu. Comes last so it overrides the hide rules above at equal specificity. */
+.is-mobile .sr-card-toolbar .sr-skip-button {
+    display: flex;
+}
