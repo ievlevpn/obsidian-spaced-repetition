@@ -36,22 +36,27 @@ export function upsertFootnoteDefinition(
     label: string,
     definition: string,
 ): string {
+    // Preserve the note's own line endings: this function rewrites the whole note text, and
+    // silently converting a CRLF note to LF would show every line as changed.
+    const usedCrlf: boolean = noteText.includes("\r\n");
     const normalised = noteText.replaceAll("\r\n", "\n");
     const lines = normalised.split("\n");
     const range = findDefinitionRange(lines, label);
 
+    let result: string;
     if (range) {
-        const updated = [
+        result = [
             ...lines.slice(0, range[0]),
             ...definition.split("\n"),
             ...lines.slice(range[1]),
-        ];
-        return updated.join("\n");
+        ].join("\n");
+    } else {
+        let base = normalised.replace(/\n+$/, "");
+        if (base.length > 0) base += "\n\n";
+        result = base + definition + "\n";
     }
 
-    let base = normalised.replace(/\n+$/, "");
-    if (base.length > 0) base += "\n\n";
-    return base + definition + "\n";
+    return usedCrlf ? result.replaceAll("\n", "\r\n") : result;
 }
 
 /** Every label in the note that belongs to this plugin. */

@@ -81,6 +81,37 @@ describe("upsertFootnoteDefinition", () => {
             "[^sr-a3f91c]: - *2026-10-03:* only\n\ntrailing prose\n",
         );
     });
+
+    test("preserves CRLF line endings when the note uses them", () => {
+        const base = "Q1:::A1 [^sr-b7102e]\r\n";
+        expect(upsertFootnoteDefinition(base, "sr-b7102e", "[^sr-b7102e]: - *2026-10-03:* x")).toBe(
+            "Q1:::A1 [^sr-b7102e]\r\n\r\n[^sr-b7102e]: - *2026-10-03:* x\r\n",
+        );
+    });
+
+    test("preserves CRLF when replacing an existing definition", () => {
+        const base =
+            "Q1:::A1 [^sr-a3f91c]\r\n\r\n[^sr-a3f91c]: - *2026-10-03:* first\r\n    - *2026-10-19:* second\r\n";
+        const updated = upsertFootnoteDefinition(
+            base,
+            "sr-a3f91c",
+            "[^sr-a3f91c]: - *2026-10-03:* rewritten",
+        );
+        expect(updated).toBe(
+            "Q1:::A1 [^sr-a3f91c]\r\n\r\n[^sr-a3f91c]: - *2026-10-03:* rewritten\r\n",
+        );
+        expect(updated).not.toContain("second");
+    });
+
+    test("leaves an LF note with LF endings", () => {
+        const base = "Q1:::A1 [^sr-b7102e]\n";
+        const updated = upsertFootnoteDefinition(
+            base,
+            "sr-b7102e",
+            "[^sr-b7102e]: - *2026-10-03:* x",
+        );
+        expect(updated).not.toContain("\r");
+    });
 });
 
 describe("collect helpers", () => {
