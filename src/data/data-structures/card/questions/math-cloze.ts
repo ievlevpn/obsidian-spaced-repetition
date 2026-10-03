@@ -4,8 +4,13 @@
 // review: each `\cloze` becomes one sibling card whose answer is occluded on the front and
 // revealed (highlighted) on the back. Other clozes in the same note show their answer plainly.
 //
+// The macro only counts inside math (`$...$` / `$$...$$`): outside math it is plain text, for
+// example in a note documenting the syntax.
+//
 // Returns bare { front, back } pairs (not CardFrontBack) so this stays a leaf module with no
 // dependency back on question-type.
+
+import { findMathSpans, isInsideMath, splitMath } from "src/utils/math-spans";
 
 const CLOZE_COLOR = "#2196f3";
 
@@ -17,13 +22,13 @@ interface MathCloze {
 }
 
 /**
- * Whether `text` contains at least one `\cloze{...}{...}` macro.
+ * Whether `text` contains at least one `\cloze{...}{...}` macro inside math.
  *
- * @param text - The text to test (a single line in the parser, or a whole card in expand)
- * @returns True if a `\cloze{` macro is present
+ * @param text - The text to test (a whole card; math spans are located within it)
+ * @returns True if a `\cloze{` macro is present inside `$...$` or `$$...$$`
  */
 export function containsMathCloze(text: string): boolean {
-    return /\\cloze\s*\{/.test(text);
+    return /\\cloze\s*\{/.test(splitMath(text).mathOnly);
 }
 
 /**
@@ -91,13 +96,19 @@ function renderCloze(cloze: MathCloze, isTarget: boolean, isBack: boolean): stri
     return `\\color{${CLOZE_COLOR}}{${placeholder}}`;
 }
 
-// Locate every `\cloze{answer}{hint}`, reading both arguments as balanced-brace groups.
+// Locate every `\cloze{answer}{hint}` inside math, reading both arguments as balanced-brace groups.
 function findMathClozes(text: string): MathCloze[] {
     const result: MathCloze[] = [];
+    const spans = findMathSpans(text);
     const cmd = "\\cloze";
     let i = text.indexOf(cmd);
     while (i !== -1) {
         const after = i + cmd.length;
+        // Outside math the macro is plain text.
+        if (!isInsideMath(spans, i)) {
+            i = text.indexOf(cmd, after);
+            continue;
+        }
         // Reject `\clozeXYZ` (a TeX command name continues with letters).
         if (/[a-zA-Z]/.test(text[after] ?? "")) {
             i = text.indexOf(cmd, after);

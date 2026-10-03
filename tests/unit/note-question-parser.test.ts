@@ -5,7 +5,7 @@ import { TopicPath, TopicPathList } from "src/data/data-structures/deck/topic-pa
 import { ISRNoteTFile } from "src/data/data-structures/file/note-file";
 import { frontmatterTagPseudoLineNum } from "src/data/data-structures/file/sr-file";
 import { DEFAULT_SETTINGS, SRSettings } from "src/data/settings";
-import { NoteQuestionParser } from "src/note/note-question-parser";
+import { hasInlineClozeProperty, NoteQuestionParser } from "src/note/note-question-parser";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { RepItemScheduleInfoFsrs } from "src/scheduling/algorithms/fsrs/rep-item-schedule-info-fsrs";
 import { RepItemScheduleInfoOsr } from "src/scheduling/algorithms/osr/rep-item-schedule-info-osr";
@@ -924,5 +924,54 @@ A::B
                 true,
             ),
         ).toMatchObject(expected);
+    });
+});
+
+describe("sr-inline note property", () => {
+    const settings: SRSettings = {
+        ...DEFAULT_SETTINGS,
+        clozePatterns: ["{{[123;;]answer[;;hint]}}"],
+        multilineCardEndMarker: "---",
+    };
+    const parser: NoteQuestionParser = createTestNoteQuestionParser(settings);
+    const vocab = "#flashcards\n- {{chien}} = dog\n- {{chat}} = cat\n";
+
+    test("with sr-inline: true, each cloze line is its own card", async () => {
+        const noteFile: ISRNoteTFile = new UnitTestSRFile(`---\nsr-inline: true\n---\n${vocab}`);
+        const questions: Question[] = await parser.createQuestionList(
+            noteFile,
+            TextDirection.Ltr,
+            null,
+            true,
+        );
+        expect(questions.map((q) => q.questionText.actualQuestion)).toEqual([
+            "- {{chien}} = dog",
+            "- {{chat}} = cat",
+        ]);
+    });
+
+    test("without it, the list is one card with two siblings", async () => {
+        const noteFile: ISRNoteTFile = new UnitTestSRFile(vocab);
+        const questions: Question[] = await parser.createQuestionList(
+            noteFile,
+            TextDirection.Ltr,
+            null,
+            true,
+        );
+        expect(questions).toHaveLength(1);
+        expect(questions[0].cards).toHaveLength(2);
+    });
+});
+
+describe("hasInlineClozeProperty", () => {
+    test.each([
+        ["sr-inline: true", true],
+        ["tags:\n  - a\nsr-inline: true", true],
+        ['sr-inline: "true"', true],
+        ["sr-inline: false", false],
+        ["other: true", false],
+        ["", false],
+    ])("%s -> %s", (frontmatter, expected) => {
+        expect(hasInlineClozeProperty(frontmatter)).toBe(expected);
     });
 });

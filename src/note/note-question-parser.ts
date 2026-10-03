@@ -163,6 +163,7 @@ export class NoteQuestionParser {
             multilineReversedCardSeparator: settings.multilineReversedCardSeparator,
             multilineCardEndMarker: settings.multilineCardEndMarker,
             clozePatterns: settings.clozePatterns,
+            inlineClozeLines: hasInlineClozeProperty(this.frontmatterText),
         };
 
         // We pass contentText which has the frontmatter blanked out; see extractFrontmatter for reasoning
@@ -384,4 +385,15 @@ export class NoteQuestionParser {
 
         return result;
     }
+}
+
+/**
+ * Whether a note's frontmatter sets `sr-inline: true`, which makes every line containing a cloze
+ * its own (inline) card. Meant for whole vocabulary files.
+ *
+ * @param frontmatterText - The note's frontmatter, with or without its `---` delimiters
+ * @returns True if the property is present and true
+ */
+export function hasInlineClozeProperty(frontmatterText: string | null | undefined): boolean {
+    return !!frontmatterText && /^sr-inline:\s*["']?true["']?\s*$/im.test(frontmatterText);
 }
