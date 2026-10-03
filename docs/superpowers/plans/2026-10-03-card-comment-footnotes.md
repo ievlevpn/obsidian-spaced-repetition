@@ -133,6 +133,14 @@ describe("the reference token", () => {
         expect(extractCardCommentRef("Q1:::A1 [^sr-a3f91c]")).toEqual(["Q1:::A1", "sr-a3f91c"]);
     });
 
+    test("extracts it when preceded by a newline, not a space", () => {
+        // The own-line case: a card ending in a code fence, or cardCommentOnSameLine false
+        expect(extractCardCommentRef("Q1:::A1\n[^sr-a3f91c]")).toEqual(["Q1:::A1", "sr-a3f91c"]);
+        expect(
+            extractCardCommentRef("F\n?\n```\ncode\n```\n[^sr-a3f91c]"),
+        ).toEqual(["F\n?\n```\ncode\n```", "sr-a3f91c"]);
+    });
+
     test("ignores a reference that is not ours", () => {
         expect(extractCardCommentRef("Q1:::A1 [^1]")).toEqual(["Q1:::A1 [^1]", null]);
         expect(extractCardCommentRef("Q1:::A1 [^mynote]")).toEqual(["Q1:::A1 [^mynote]", null]);
@@ -290,7 +298,9 @@ export interface CardCommentEntry {
 
 const REF_PREFIX = "sr-";
 const DEFINITION_LINE_REGEX = /^\s*\[\^[^\]]+\]:/;
-const CARD_COMMENT_REF_ENDOFLINE_REGEX = / \[\^(sr-[0-9a-f]+)\]$/;
+// \s, not a literal space: in the own-line case (a card ending in a code fence, or
+// cardCommentOnSameLine: false) the token is preceded by a NEWLINE, not a space.
+const CARD_COMMENT_REF_ENDOFLINE_REGEX = /\s\[\^(sr-[0-9a-f]+)\]$/;
 const ENTRY_INDENT = "    ";
 const CONTINUATION_INDENT = "      ";
 const DATED_ENTRY_REGEX = /^-\s+\*(\d{4}-\d{2}-\d{2}):\*\s?(.*)$/;
