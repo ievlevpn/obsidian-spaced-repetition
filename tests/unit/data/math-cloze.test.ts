@@ -143,3 +143,39 @@ describe("a block mixing \\cloze with clozecraft deletions", () => {
         expect(expand("published in ==1905== by ==Einstein==")).toHaveLength(2);
     });
 });
+
+describe("braces inside math belong to LaTeX", () => {
+    // The vault's own cloze pattern: the default settings only know ==...==
+    const vaultExpand = (text: string) =>
+        CardFrontBackUtil.expand(CardType.Cloze, text, {
+            ...DEFAULT_SETTINGS,
+            clozePatterns: ["{{[123;;]answer[;;hint]}}"],
+        });
+
+    test("{{...}} inside math is not a cloze and stays intact on the card", () => {
+        const cards = vaultExpand("$\\frac{{a}}{b}$ and {{c}}");
+        expect(cards).toHaveLength(1);
+        expect(cards[0].front).toContain("$\\frac{{a}}{b}$");
+        expect(cards[0].back).toContain("$\\frac{{a}}{b}$");
+    });
+
+    test("{{...}} inside display math alone makes no card", () => {
+        expect(vaultExpand("$$\n{{n} \\choose {k}}\n$$")).toEqual([]);
+    });
+
+    test("a cloze whose answer contains math keeps the math", () => {
+        const [card] = vaultExpand("The norm is {{$\\|x\\|$}}.");
+        expect(card.back).toContain("$\\|x\\|$");
+    });
+
+    test("\\cloze outside math is plain text, not a card", () => {
+        expect(vaultExpand("write \\cloze{a}{b} inside math")).toEqual([]);
+        expect(containsMathCloze("write \\cloze{a}{b} inside math")).toBe(false);
+    });
+
+    test("math clozes and text clozes in one block, with LaTeX braces untouched", () => {
+        const cards = vaultExpand("$\\cloze{x^{{2}}}{} = y$ and {{z}}");
+        expect(cards).toHaveLength(2);
+        expect(cards[1].front).toContain("$x^{{2}} = y$");
+    });
+});

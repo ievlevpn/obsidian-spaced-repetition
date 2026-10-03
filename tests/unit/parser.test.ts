@@ -355,8 +355,20 @@ Line 5
             },
         ),
     ).toEqual([
-        [CardType.MultiLineBasic, "Question 1?\n??\nAnswer to question 1", 5, 7],
-        [CardType.MultiLineBasic, "Question 2?\n??\nAnswer to question 2", 13, 15],
+        // In marker mode a card starts right after the previous marker, so prose above the
+        // question in the same section is part of the card's front.
+        [
+            CardType.MultiLineBasic,
+            "line 1\n\n\nline 2\n\nQuestion 1?\n??\nAnswer to question 1",
+            0,
+            7,
+        ],
+        [
+            CardType.MultiLineBasic,
+            "line 3\n\nline 4\n\nQuestion 2?\n??\nAnswer to question 2",
+            9,
+            15,
+        ],
     ]);
 
     // empty string or whitespace character provided
@@ -893,16 +905,12 @@ test("Test footnote definitions are skipped entirely", () => {
 
 test("Test a card carrying a comment reference parses normally", () => {
     // "Q1:::A1" parses as SingleLineReversed; see note in the test above.
-    expect(
-        parseT("Q1:::A1 [^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions),
-    ).toEqual([
+    expect(parseT("Q1:::A1 [^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions)).toEqual([
         [CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", 0, 0],
     ]);
 
     // Own-line schedule: the reference shares that line
-    expect(
-        parseT("Q1:::A1\n[^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions),
-    ).toEqual([
+    expect(parseT("Q1:::A1\n[^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions)).toEqual([
         [CardType.SingleLineReversed, "Q1:::A1\n[^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", 0, 1],
     ]);
 });

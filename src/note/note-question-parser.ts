@@ -3,7 +3,7 @@ import { TagCache } from "obsidian";
 import { DataStore } from "src/data/data-store/base/data-store";
 import { RepItemStorageInfo } from "src/data/data-store/base/rep-item-storage-info";
 import { Card } from "src/data/data-structures/card/card";
-import { Question, QuestionText } from "src/data/data-structures/card/questions/question";
+import { CardType, Question, QuestionText } from "src/data/data-structures/card/questions/question";
 import {
     CardFrontBack,
     CardFrontBackUtil,
@@ -14,6 +14,7 @@ import { frontmatterTagPseudoLineNum } from "src/data/data-structures/file/sr-fi
 import { SettingsUtil, SRSettings } from "src/data/settings";
 import { parse, ParsedQuestionInfo, ParserOptions } from "src/parser";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
+import { getListContext } from "src/utils/list-context";
 import { collectCardCommentDefinitions } from "src/utils/note-footnotes";
 import {
     splitNoteIntoFrontmatterAndContent,
@@ -163,6 +164,7 @@ export class NoteQuestionParser {
             multilineReversedCardSeparator: settings.multilineReversedCardSeparator,
             multilineCardEndMarker: settings.multilineCardEndMarker,
             clozePatterns: settings.clozePatterns,
+            inlineClozeLines: hasInlineClozeProperty(this.frontmatterText),
         };
 
         // We pass contentText which has the frontmatter blanked out; see extractFrontmatter for reasoning
@@ -183,6 +185,9 @@ export class NoteQuestionParser {
             textDirection,
             questionContext,
         );
+        if (parsedQuestionInfo.isInline && parsedQuestionInfo.cardType === CardType.Cloze) {
+            result.listContext = getListContext(this.noteLines, parsedQuestionInfo.firstLineNum);
+        }
         return result;
     }
 
@@ -384,4 +389,15 @@ export class NoteQuestionParser {
 
         return result;
     }
+}
+
+/**
+ * Whether a note's frontmatter sets `sr-inline: true`, which makes every line containing a cloze
+ * its own (inline) card. Meant for whole vocabulary files.
+ *
+ * @param frontmatterText - The note's frontmatter, with or without its `---` delimiters
+ * @returns True if the property is present and true
+ */
+export function hasInlineClozeProperty(frontmatterText: string | null | undefined): boolean {
+    return !!frontmatterText && /^sr-inline:\s*["']?true["']?\s*$/im.test(frontmatterText);
 }

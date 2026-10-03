@@ -7,6 +7,7 @@ import {
 } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
+import { maskMath } from "src/utils/math-spans";
 import { findLineIndexOfSearchStringIgnoringWs } from "src/utils/strings";
 
 export class CardFrontBack {
@@ -115,7 +116,10 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
             );
         }
 
-        const clozeNote = clozecrafter.createClozeNote(stripMathClozes(questionText));
+        // Inside math, braces are LaTeX's business: mask the math so `{{...}}` there is never a
+        // cloze, and put it back into every rendered side.
+        const { masked, restore } = maskMath(stripMathClozes(questionText));
+        const clozeNote = clozecrafter.createClozeNote(masked);
 
         // Determine which question formatter to use based on settings (Cloze patterns as inputs or not).
         const clozeFormatter = settings.convertClozePatternsToInputs
@@ -127,8 +131,8 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
         if (clozeNote === null) return result;
 
         for (let i = 0; i < clozeNote.numCards; i++) {
-            front = clozeNote.getCardFront(i, clozeFormatter);
-            back = clozeNote.getCardBack(i, clozeFormatter);
+            front = restore(clozeNote.getCardFront(i, clozeFormatter));
+            back = restore(clozeNote.getCardBack(i, clozeFormatter));
             result.push(new CardFrontBack(front, back));
         }
 
@@ -147,9 +151,10 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
      * @returns `text` with every `{{...}}` / `==...==` deletion replaced by its answer
      */
     private flattenClozecraftDeletions(text: string, clozecrafter: ClozeCrafter): string {
-        const note = clozecrafter.createClozeNote(text);
+        const { masked, restore } = maskMath(text);
+        const note = clozecrafter.createClozeNote(masked);
         if (note === null || note.numCards === 0) return text;
-        return note.getCardFront(0, new PlainClozeFormatter());
+        return restore(note.getCardFront(0, new PlainClozeFormatter()));
     }
 }
 
