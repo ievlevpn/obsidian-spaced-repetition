@@ -25,6 +25,15 @@ describe("footnote line predicates", () => {
         expect(isFootnoteContinuationLine("not indented")).toBe(false);
         expect(isFootnoteContinuationLine("")).toBe(false);
     });
+
+    test("does not treat an indented line as a definition", () => {
+        // Our own entry and continuation indents, and a "[^x]:" typed inside a comment
+        expect(isFootnoteDefinitionLine("    - *2026-10-19:* second")).toBe(false);
+        expect(isFootnoteDefinitionLine("    [^foo]: inside our own definition")).toBe(false);
+        expect(isFootnoteDefinitionLine("      [^foo]: a continuation line")).toBe(false);
+        // Up to 3 leading spaces is still a definition
+        expect(isFootnoteDefinitionLine("   [^1]: three spaces is allowed")).toBe(true);
+    });
 });
 
 describe("the reference token", () => {
@@ -58,6 +67,19 @@ describe("the reference token", () => {
 
     test("returns the text unchanged when there is no reference", () => {
         expect(extractCardCommentRef("Q1:::A1")).toEqual(["Q1:::A1", null]);
+    });
+
+    test("only claims labels of exactly six hex digits", () => {
+        expect(extractCardCommentRef("Q1:::A1 [^sr-a3f91c]")).toEqual(["Q1:::A1", "sr-a3f91c"]);
+        expect(extractCardCommentRef("Q1:::A1 [^sr-a]")).toEqual(["Q1:::A1 [^sr-a]", null]);
+        expect(extractCardCommentRef("Q1:::A1 [^sr-a3f91cde]")).toEqual([
+            "Q1:::A1 [^sr-a3f91cde]",
+            null,
+        ]);
+        expect(extractCardCommentRef("Q1:::A1 [^sr-ZZZZZZ]")).toEqual([
+            "Q1:::A1 [^sr-ZZZZZZ]",
+            null,
+        ]);
     });
 });
 

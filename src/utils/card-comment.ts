@@ -4,10 +4,14 @@ export interface CardCommentEntry {
 }
 
 const REF_PREFIX = "sr-";
-const DEFINITION_LINE_REGEX = /^\s*\[\^[^\]]+\]:/;
+// At most 3 leading spaces: that is markdown's limit for a footnote definition, and it stops
+// this matching our own indented entry (4 spaces) and continuation (6 spaces) lines, or a
+// "[^x]:" a user typed as a later line of a comment.
+const DEFINITION_LINE_REGEX = /^ {0,3}\[\^[^\]]+\]:/;
 // \s, not a literal space: in the own-line case (a card ending in a code fence, or
 // cardCommentOnSameLine: false) the token is preceded by a NEWLINE, not a space.
-const CARD_COMMENT_REF_ENDOFLINE_REGEX = /\s\[\^(sr-[0-9a-f]+)\]$/;
+// Exactly 6 hex digits, matching what generateCardCommentLabel emits.
+const CARD_COMMENT_REF_ENDOFLINE_REGEX = /\s\[\^(sr-[0-9a-f]{6})\]$/;
 const ENTRY_INDENT = "    ";
 const CONTINUATION_INDENT = "      ";
 const DATED_ENTRY_REGEX = /^-\s+\*(\d{4}-\d{2}-\d{2}):\*\s?(.*)$/;
