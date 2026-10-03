@@ -2,6 +2,7 @@ import { ClozeCrafter } from "clozecraft";
 
 import { SR_METADATA_CALLOUT } from "src/data/constants";
 import { CardType } from "src/data/data-structures/card/questions/question";
+import { isFootnoteContinuationLine, isFootnoteDefinitionLine } from "src/utils/card-comment";
 
 export let debugParser = false;
 
@@ -111,6 +112,15 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             continue;
         }
 
+        // Skip footnote definitions wholesale, including indented continuations. Their text
+        // is prose the plugin must not interpret: a definition containing ":::" would
+        // otherwise be picked up as a card, and one sitting directly under a multi line card
+        // would be absorbed into it. This also protects the user's own footnotes.
+        if (isFootnoteDefinitionLine(currentLine)) {
+            while (i + 1 < lines.length && isFootnoteContinuationLine(lines[i + 1])) i++;
+            continue;
+        }
+
         // Have we reached the end of a card?
         const isEmptyLine = currentTrimmed.length === 0;
         const hasMultilineCardEndMarker =
@@ -156,8 +166,12 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             cardText = currentLine;
             firstLineNo = i;
 
-            // Pick up scheduling information if present
-            if (i + 1 < lines.length && lines[i + 1].startsWith("<!--SR:")) {
+            // Pick up scheduling information if present. The line may begin with this
+            // plugin's footnote reference, which travels immediately before the schedule.
+            const nextLine: string = i + 1 < lines.length ? lines[i + 1] : "";
+            const nextIsSchedule: boolean =
+                nextLine.startsWith("<!--SR:") || /^\[\^sr-[0-9a-f]{6}\] <!--SR:/.test(nextLine);
+            if (nextIsSchedule) {
                 cardText += "\n" + lines[i + 1];
                 i++;
             } else if (i + 1 < lines.length && lines[i + 1].startsWith(SR_METADATA_CALLOUT)) {
