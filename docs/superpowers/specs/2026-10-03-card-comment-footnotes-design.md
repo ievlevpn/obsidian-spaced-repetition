@@ -125,6 +125,23 @@ absorbed into that card's text. The skip removes all three.
 It is a *skip*, strictly simpler than the archived design's absorb-and-re-emit: comment text
 never enters a card's text region, so the parser never has to give it back.
 
+Two refinements the implementation had to add, both found by the final whole-branch review:
+
+- A definition line **terminates** any card accumulating above it, exactly as a blank line
+  does. Merely dropping the line while accumulation continued past it left
+  `questionText.original` non-contiguous in the note, so `MultiLineTextFinder` missed forever,
+  every write was suppressed, and the card's schedule silently never persisted. Terminating
+  also keeps `ParsedQuestionInfo.lastLineNum` honest; dropping inflated it by one plus the
+  definition's continuation count, without bound.
+- The single-line lookahead must absorb a **bare** own-line reference, not only one followed by
+  a schedule comment: `/^\[\^sr-[0-9a-f]{6}\]( <!--SR:|$)/`. A card with no schedule yet has
+  no comment for the reference to sit in front of, so `formatForNote` emits a bare
+  `\n[^sr-xxxxxx]` line under own-line placement. Unabsorbed, the card re-parsed without its
+  reference, minted a fresh label, and appended another reference line and another definition
+  on **every** comment - the archived design's exact unbounded-append death mode, dormant
+  behind one boolean (`cardCommentOnSameLine`, whose shipped default is `false`). 641 of this
+  vault's 6385 cards were at risk under that default.
+
 ## Read path: showing past entries
 
 `NoteQuestionParser` already holds the whole note in `this.noteLines` and loops over parsed
@@ -140,6 +157,21 @@ Two degenerate cases, decided here rather than discovered later:
 - **Two cards carrying the same label** (only reachable by hand-editing): the first definition
   found wins for both, and a write from either card rewrites that one definition. Not defended
   against; labels are generated unique and this cannot arise from normal use.
+- **Two byte-identical cards in one note**: a comment is **refused**, not written.
+  `MultiLineTextFinder` takes the first match, so a comment typed on the second copy would be
+  planted on the first - visibly, permanently - and the next comment would mint a second label
+  and a surplus definition. There is nothing to disambiguate with: the label *is* card
+  identity, but it cannot be used for lookup until it has already been written. So
+  `NotesDataStore.write` counts the card text's matches in the note and, when there is more
+  than one, discards the staged comment with a `console.warn`. The schedule write still goes
+  ahead: the copies are byte-identical, so their schedules are interchangeable, and writing to
+  the first match is pre-existing upstream behaviour. As soon as the copies differ - including
+  because one of them has acquired a different schedule comment - commenting works normally.
+- **The card's text cannot be found at all** (the note changed under us): nothing is written,
+  and the label allocated during this write is **rolled back** onto the question. Leaving it
+  there meant the next successful write - a short-term requeue, or Edit Card, which writes
+  unconditionally - emitted `[^sr-...]` into the user's prose with no definition anywhere. A
+  reference must never outlive its definition. The staged comment text is dropped.
 
 ## Write path
 
@@ -175,8 +207,10 @@ it through `RenderMarkdownWrapper`. The review keydown handler already bails whe
 `activeElement` is a `TEXTAREA`, so shortcuts need no work.
 
 All five exits harvest the typed text: rate, skip, close view/modal, back-to-deck-list, and
-Edit/Delete Card. The archived attempt shipped three of these and lost text on the other two;
-all five are required here. Cram mode neither shows the box nor writes anything, with the
+Edit Card. The archived attempt shipped three of these and lost text on the other two.
+**Delete Card discards the typed text by design** - `NotesDataStore.delete` removes the card
+and leaves any definition behind as harmless clutter, so there is nothing to attach a new
+entry to. Cram mode neither shows the box nor writes anything, with the
 guard inside the sequencer methods so every call site is covered.
 
 ## Reused from `archive/card-comments-callout`
@@ -207,23 +241,97 @@ assertions against the real written file. Note `question.test.ts` tests that cal
 1. `textHash` byte-identical for the same card with and without a reference token.
 2. Round-trip, for each card type, under both `cardCommentOnSameLine` settings: inline,
    single-line-reversed, multi-line, multi-line ending in a code fence, cloze, and a card
-   carrying an Obsidian block id as well as a reference.
+   carrying an Obsidian block id as well as a reference. Both at the
+   `QuestionText`/`formatForNote` level **and** as a full parse -> write -> re-parse through
+   the sequencer.
 3. Trailing-token loop strip: reference only, block id only, both in either order.
 4. Repeated review cycles converge — three successive rated reviews of a commented card leave
    the note byte-identical apart from the schedule and the new entries. This is the test the
-   archived design failed.
+   archived design failed. **Byte equality, not fragment matching**, over every card shape
+   under **both** `cardCommentOnSameLine` values, and for an unscheduled card driven by
+   `flushPendingCardComment` as well as a scheduled one driven by `processReview`. The
+   unscheduled own-line case is the one that did not converge, and a weaker version of this
+   test is what let it through six task reviews. Use `ReviewResponse.Again` in the loop:
+   `Good` pushes the due date past the static test date, the card leaves the queue, and
+   `currentCard` is null on the second iteration.
 5. Content **after** the card, and after the definition, is byte-identical following a write.
 6. Parser skips definitions containing `:::`, `{{x}}`, `$\cloze{a}{b}$`, and a definition
    directly under a multi-line card with no blank line — no phantom cards, host card intact.
 7. `updateCardCommentDefinition`: appends when absent; replaces in place when present,
    preserving the rest of the file; handles a file with no trailing newline; leaves a user's
    own numeric footnotes untouched.
-8. Label generation is unique against existing `[^sr-…]` labels in the note.
+8. Label generation is unique against the note's existing `[^sr-…]` **definition** labels.
+   (It scans definition lines, not references, so a card whose definition was hand-deleted is
+   invisible to the collision check - 2^-24 per allocation, accepted.)
 9. Entry formatting: multi-line input, leading `-`/`>`/`\` escaping reversible, blank input
    is not an entry, two entries on one day stay two entries.
-10. Two identical cards in one file still behave (first-match-wins in
-    `MultiLineTextFinder.findAndReplace` not made worse).
+10. Two identical cards in one file: the comment is refused rather than attributed to the
+    wrong copy, nothing accumulates however many comments are typed, the schedules still
+    persist, and commenting works again once the copies differ. (The earlier claim that
+    first-match-wins was "not made worse" was false: before, a mis-attribution swapped two
+    identical schedules and was invisible and self-correcting; with a comment it planted a
+    visible marker and a dated entry on the wrong card, permanently, plus a surplus
+    definition.)
 11. Cram mode writes nothing.
+
+## Limitations
+
+Known, accepted, and written down here because each one is silent.
+
+### Leave a blank line before anything you add under an `sr-` footnote
+
+This log is meant to be hand-edited, and this is the one rule for doing it.
+
+`isFootnoteContinuationLine` is markdown's own lazy-continuation rule: **any** indented
+non-blank line continues the definition above it. So content glued directly beneath an entry -
+an indented code block, a nested table - is read back as continuation *text* of that entry and
+re-emitted at this module's single uniform continuation indent on the next comment write:
+
+```
+before:                              after one comment write:
+[^sr-aaaaaa]: - *2026-01-01:* old    [^sr-aaaaaa]: - *2026-01-01:* old
+    def f(x):                              def f(x):
+        return x + 1                       return x + 1
+                                         - *2026-01-01:* entry 1
+```
+
+**Nothing is deleted - the text survives in full.** But 4/8-space nesting comes back flattened
+to one 6-space level, and a tab-indented table comes back 6-space indented, which destroys the
+snippet as *structure* while leaving it intact as prose. That makes the damage semantic and
+invisible to both a diff reviewer and the user until they next read that snippet. A single
+blank line before the added content stops it completely, because it ends the definition's
+range.
+
+The write path can never create this shape by itself: an append always inserts a blank line
+and always targets the end of the note. It takes a hand-edit.
+
+### The comment box is hidden for any card containing a `>` line
+
+`CardContainer` suppresses the box when any line of `questionText.original` trim-starts with
+`>`. This is **wider than "the card is hosted in a blockquote"**: it also catches a card whose
+*answer* merely quotes something, or contains a `> [!note]` callout, which in a maths or
+philosophy vault is a normal thing for an answer to contain. Measured on a 4263-card vault:
+**17 cards (0.4%)**, with no explanation shown to the user.
+
+The width is deliberate, not an oversight. An earlier attempt checked only the first line and
+missed the common case of a card whose quote starts further down, which is the shape that
+actually occurs. The reason to suppress at all: the reference lands on the card line inside
+the quoted region, but the definition it points at necessarily lands at the end of the note,
+outside the quote, so the pair reads as part of a quote the user did not write.
+
+### Smaller ones
+
+- **The first append to a note collapses its trailing blank lines** to one. Cosmetic, one-time
+  per note.
+- **A definition line inside a card's text region ends the card there**, exactly as a blank
+  line would, so such a card may lose its answer side. Strictly better than the alternative
+  (a non-contiguous card whose schedule silently never persists), and 0 of this vault's 4263
+  cards have the shape.
+- **`findDefinitionRange` takes the first definition for a label,
+  `collectCardCommentDefinitions` the last.** Only reachable by hand-editing two definitions
+  onto one label; the consequence is content *duplication*, not loss.
+- **`Note.writeNoteFile` drops a staged comment**, reachable only via the load-time rewrite
+  that fires when a question has more schedules than cards. No note damage.
 
 ## Out of scope
 

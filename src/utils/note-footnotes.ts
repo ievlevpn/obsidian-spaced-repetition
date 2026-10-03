@@ -6,7 +6,18 @@ import { isFootnoteContinuationLine, isFootnoteDefinitionLine } from "src/utils/
 const LABEL_REGEX = /^ {0,3}\[\^([^\]]+)\]:/;
 const CARD_COMMENT_LABEL_REGEX = /^sr-[0-9a-f]{6}$/;
 
-/** Index range [start, endExclusive) of the definition's lines, or null. */
+/**
+ * Index range [start, endExclusive) of the definition's lines, or null.
+ *
+ * The range runs to the first non-continuation line, i.e. the first blank or unindented line.
+ * That means content a user glued directly beneath an entry is INSIDE the range and will be
+ * re-emitted at a uniform indent - see the limitation on isFootnoteContinuationLine in
+ * src/utils/card-comment.ts. Takes the FIRST definition matching `label`, where
+ * collectCardCommentDefinitions takes the last; with two definitions sharing one label (only
+ * reachable by hand-edit, since generation is collision-checked) the consequence is content
+ * DUPLICATION, not loss: the first is overwritten with the last's content plus the new entry,
+ * and the last survives.
+ */
 function findDefinitionRange(lines: string[], label: string): [number, number] | null {
     for (let i = 0; i < lines.length; i++) {
         const match = lines[i].match(LABEL_REGEX);

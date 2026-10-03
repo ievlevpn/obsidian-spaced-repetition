@@ -389,6 +389,17 @@ export class CardContainer {
         // Evaluate cloze answers
         this._evaluateClozeAnswers();
 
+        // The comment box is suppressed for any card that contains a ">" line anywhere.
+        //
+        // This is DELIBERATELY wider than "the card is hosted inside a blockquote": it also
+        // catches a card whose answer merely quotes something, or contains a "> [!note]"
+        // callout. Measured on a 4263-card vault, that is 17 cards (0.4%), silently. The wide
+        // test is the ruling, not an oversight: an earlier attempt checked only the first
+        // line and missed the common case of a card whose quote starts further down, which is
+        // the shape that actually occurs. A reference emitted inside a quoted region renders,
+        // but the definition it points at necessarily lands at the end of the note, outside
+        // the quote, so the pair reads as part of a quote the user did not write. Refusing the
+        // box is the conservative choice. Recorded in the design doc's limitations.
         const cardText: string = sessionData.currentQuestion.questionText.original;
         const hostedInBlockquote: boolean = cardText
             .split("\n")

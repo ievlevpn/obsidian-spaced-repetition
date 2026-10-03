@@ -34,7 +34,25 @@ export function isFootnoteDefinitionLine(line: string): boolean {
     return DEFINITION_LINE_REGEX.test(line);
 }
 
-/** True if the line is an indented continuation of a footnote definition. */
+/**
+ * True if the line is an indented continuation of a footnote definition.
+ *
+ * LIMITATION, and the one hand-editing rule this feature has:
+ * **leave a blank line before anything you add under an `sr-` footnote.**
+ *
+ * This predicate is deliberately markdown's own lazy-continuation rule: ANY indented
+ * non-blank line continues the definition above it. So content a user glues directly beneath
+ * an entry - an indented code block, a nested table - is read back as continuation text of
+ * that entry by parseCardCommentDefinition, and re-emitted by formatCardCommentDefinition at
+ * this module's uniform CONTINUATION_INDENT. Nothing is deleted; the TEXT survives in full.
+ * But a 4/8-space nesting comes back flattened to a single 6-space level, which destroys the
+ * code or table as structure while leaving it intact as prose - silent, and semantic rather
+ * than visible. A single blank line before the added content stops it completely, because it
+ * ends the definition's range.
+ *
+ * The write path can never create this shape itself: an append always inserts a blank line
+ * and always targets the end of the note. It takes a hand-edit.
+ */
 export function isFootnoteContinuationLine(line: string): boolean {
     return /^[ \t]+\S/.test(line);
 }
@@ -54,7 +72,15 @@ export function extractCardCommentRef(text: string): [string, string | null] {
     return [text.substring(0, text.length - match[0].length).trimEnd(), match[1]];
 }
 
-/** Renders a complete footnote definition, with no trailing newline. */
+/**
+ * Renders a complete footnote definition, with no trailing newline.
+ *
+ * Every continuation line is emitted at CONTINUATION_INDENT, a single uniform level. This
+ * pairs with parseCardCommentDefinition, which flattens any multi-level indentation it reads
+ * into continuation text; together they re-indent hand-edited indented content glued under an
+ * entry. See the limitation on isFootnoteContinuationLine above: leave a blank line before
+ * anything you add under an `sr-` footnote.
+ */
 export function formatCardCommentDefinition(
     label: string,
     entries: CardCommentEntry[],
@@ -98,7 +124,10 @@ export function parseCardCommentDefinition(definition: string): CardCommentEntry
         }
 
         if (entries.length > 0) {
-            // An indented line that is not a bullet continues the entry above it
+            // An indented line that is not a bullet continues the entry above it. Its own
+            // indentation is discarded here and re-emitted at the single uniform
+            // CONTINUATION_INDENT by formatCardCommentDefinition - see the limitation noted
+            // on isFootnoteContinuationLine.
             entries[entries.length - 1].text += "\n" + unescapeLine(trimmed);
         } else {
             // A hand-written definition with no bullet at all
