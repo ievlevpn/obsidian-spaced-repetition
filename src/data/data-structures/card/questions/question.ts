@@ -251,6 +251,10 @@ export class Question {
     private pendingCardCommentText: string | null = null;
     private pendingCardCommentDate: string | null = null;
 
+    // Whether the most recent updateQuestionWithinNoteText call located this question's
+    // original text. False means the note changed under us and nothing should be written.
+    lastUpdateFoundOriginal: boolean = true;
+
     get questionType(): CardType {
         return this.parsedQuestionInfo.cardType;
     }
@@ -317,7 +321,7 @@ export class Question {
         const date: string | null = this.pendingCardCommentDate;
         this.pendingCardCommentText = null;
         this.pendingCardCommentDate = null;
-        if (!text || !date) return null;
+        if (!text || text.trim().length === 0 || !date) return null;
 
         let label: string | null = this.questionText.cardCommentRef;
         if (!label) {
@@ -403,6 +407,7 @@ export class Question {
 
         let newText = MultiLineTextFinder.findAndReplace(noteText, originalText, replacementText);
         if (newText) {
+            this.lastUpdateFoundOriginal = true;
             // Don't support changing the textDirection setting
             this.questionText = QuestionText.create(
                 replacementText,
@@ -410,6 +415,7 @@ export class Question {
                 settings,
             );
         } else {
+            this.lastUpdateFoundOriginal = false;
             console.warn(
                 `updateQuestionText: Text not found: ${originalText.substring(
                     0,

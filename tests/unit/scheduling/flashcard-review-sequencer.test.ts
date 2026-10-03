@@ -1049,6 +1049,40 @@ describe("card comments", () => {
 
         expect(await c.file.read()).toBe(before);
     });
+
+    test("a rated card with a comment performs exactly one file write", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+        const writeSpy = jest.spyOn(c.file, "write");
+
+        c.reviewSequencer.setPendingCardComment("a thought");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        writeSpy.mockRestore();
+    });
+
+    test("writes nothing when the card's text can no longer be found in the note", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        // Simulate the note being changed externally mid-review
+        c.file.content = "totally different note\n";
+        const writeSpy = jest.spyOn(c.file, "write");
+
+        c.reviewSequencer.setPendingCardComment("orphan risk");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(await c.file.read()).toBe("totally different note\n");
+    });
+
+    test("blank staged text emits no reference on the card", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("    ");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(await c.file.read()).not.toContain("[^sr-");
+    });
 });
 
 describe("updateCurrentQuestionTextAndCards", () => {

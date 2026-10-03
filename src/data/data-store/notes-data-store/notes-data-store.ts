@@ -91,21 +91,24 @@ export class NotesDataStore implements IDataStore {
     async write(question: Question): Promise<void> {
         const fileText: string = await question.note.file.read();
 
-        // Resolve the comment FIRST: it may allocate the footnote label, which must be on
-        // the question before updateQuestionWithinNoteText emits the reference token.
+        // Resolve first: it may allocate the label that the card rewrite then emits.
         const definition: string | null = question.resolveCardComment(fileText);
 
-        let newText: string = question.updateQuestionWithinNoteText(fileText, this.settings);
+        const newText: string = question.updateQuestionWithinNoteText(fileText, this.settings);
 
-        // The definition lives outside any card's text, so it is a separate pure transform
-        // over the same note text - composed here to keep this a single read and write.
+        // If the card's text could not be located, the note changed under us. Write nothing:
+        // appending a definition would orphan it, and a no-op whole-file write is itself a
+        // sync-conflict risk.
+        if (!question.lastUpdateFoundOriginal) return;
+
+        let finalText: string = newText;
         const label: string | null = question.questionText.cardCommentRef;
         if (definition && label) {
-            newText = upsertFootnoteDefinition(newText, label, definition);
+            finalText = upsertFootnoteDefinition(newText, label, definition);
             question.cardCommentDefinition = definition;
         }
 
-        await question.note.file.write(newText);
+        await question.note.file.write(finalText);
         question.hasChanged = false;
     }
 
