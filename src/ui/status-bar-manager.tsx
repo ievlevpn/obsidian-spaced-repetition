@@ -7,6 +7,9 @@ import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
 import CounterStatusBarItem from "src/ui/obsidian-ui-components/statusbar-items/counter-statusbar-item";
 import TextStatusBarItem from "src/ui/obsidian-ui-components/statusbar-items/text-statusbar-item";
 
+// Private fork: never compare against upstream's GitHub releases (see checkAndUpdatePluginVersion)
+const FORK_SKIPS_UPSTREAM_UPDATE_CHECK = true;
+
 export type StatusBarItemPurpose = "card-review" | "note-review" | "update-available";
 export const StatusBarItemTypesArray: ReadonlyArray<StatusBarItemPurpose> = [
     "card-review",
@@ -178,6 +181,10 @@ export default class StatusBarManager {
     }
 
     private async checkAndUpdatePluginVersion() {
+        // This is a private fork: upstream releases are never an update for it, and its version
+        // (900.x) never matches upstream's, so the check would always announce one.
+        if (FORK_SKIPS_UPSTREAM_UPDATE_CHECK) return;
+
         // Set update statusbar item, if the versions miss match
         const newestVersion: string = await this.getNewestVersion();
 

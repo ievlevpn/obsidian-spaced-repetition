@@ -1,11 +1,11 @@
 {
     "id": "obsidian-spaced-repetition",
-    "name": "Spaced Repetition",
-    "version": "1.15.4",
+    "name": "Spaced Repetition (private fork)",
+    "version": "900.0.0",
     "minAppVersion": "1.2.8",
-    "description": "Fight the forgetting curve by reviewing flashcards & entire notes using spaced repetition. Organize your flashcards into decks and learn only the cards you need to recall.",
-    "author": "Stephen Mwangi",
-    "authorUrl": "https://github.com/st3v3nmw",
+    "description": "Pavel's private fork of Spaced Repetition (based on upstream 1.15.4), installed by Claude/scripts/sr-fork-install.sh. Do NOT update it from the community plugins store: that replaces the fork with the stock plugin. The version is set far above upstream's so Obsidian never offers that update.",
+    "author": "Pavel Ievlev (fork of Stephen Mwangi's plugin)",
+    "authorUrl": "https://github.com/ievlevpn/obsidian-spaced-repetition",
     "helpUrl": "https://stephenmwangi.com/obsidian-spaced-repetition/",
     "isDesktopOnly": false,
     "fundingUrl": "https://ko-fi.com/M4M44DEN6"
