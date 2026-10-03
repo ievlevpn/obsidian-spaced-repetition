@@ -8,6 +8,7 @@ import SRPlugin from "src/main";
 import { DataPage } from "src/ui/obsidian-ui-components/content-container/settings-page/data-page";
 import { FlashcardsPage } from "src/ui/obsidian-ui-components/content-container/settings-page/flashcards-page";
 import { MainPage } from "src/ui/obsidian-ui-components/content-container/settings-page/main-page";
+import { MobilePage } from "src/ui/obsidian-ui-components/content-container/settings-page/mobile-page";
 import { NotesPage } from "src/ui/obsidian-ui-components/content-container/settings-page/notes-page";
 import { SchedulingPage } from "src/ui/obsidian-ui-components/content-container/settings-page/scheduling-page";
 import { SettingsPage } from "src/ui/obsidian-ui-components/content-container/settings-page/settings-page";
@@ -26,6 +27,7 @@ export type SettingsPageType =
     | "notes-page"
     | "scheduling-page"
     | "ui-preferences-page"
+    | "mobile-page"
     | "data-page"
     | "statistics-page";
 
@@ -40,6 +42,7 @@ export const SettingsPageTypesArray: ReadonlyArray<SettingsPageType> = [
     "notes-page",
     "scheduling-page",
     "ui-preferences-page",
+    "mobile-page",
     "data-page",
     "statistics-page",
 ];
@@ -62,6 +65,8 @@ export function getPageName(pageType: SettingsPageType): string {
             return t("SCHEDULING");
         case "ui-preferences-page":
             return t("UI");
+        case "mobile-page":
+            return t("MOBILE_SETTINGS_PAGE");
         case "data-page":
             return t("DATA_PAGE_NAME");
         case "statistics-page":
@@ -87,6 +92,8 @@ export function getPageIcon(pageType: SettingsPageType): string {
             return "calendar";
         case "ui-preferences-page":
             return "presentation";
+        case "mobile-page":
+            return "smartphone";
         case "data-page":
             return "hard-drive";
         case "statistics-page":
@@ -241,6 +248,21 @@ export class SettingsPageManager {
                             this.settingsManager,
                             this.dataManager,
                             this.uiManager,
+                            pageType,
+                            this.applySettingsUpdate.bind(this),
+                            this.display,
+                            this.openPage.bind(this),
+                            this.scrollListener.bind(this),
+                        ),
+                    );
+                    break;
+                case "mobile-page":
+                    this.pages.push(
+                        new MobilePage(
+                            newPageContainerEl,
+                            this.plugin,
+                            this.settingsManager,
+                            this.dataManager,
                             pageType,
                             this.applySettingsUpdate.bind(this),
                             this.display,

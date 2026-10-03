@@ -65,6 +65,8 @@ export interface SRSettings {
     flashcardHardText: string;
     reviewButtonDelay: number;
     openViewInNewTabMobile: boolean;
+    // Mobile: swipe left from the right edge of the screen to skip the card
+    mobileSwipeToSkip: boolean;
     showDeleteButtonInCardView: boolean;
     showDeleteButtonInFileMenu: boolean;
     openViewInNewTab: boolean;
@@ -158,6 +160,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     showDeleteButtonInFileMenu: false,
     openViewInNewTab: false,
     openViewInNewTabMobile: false,
+    mobileSwipeToSkip: true,
     useCustomHotkeys: false,
     useCalloutsForSchedulingComments: false,
 

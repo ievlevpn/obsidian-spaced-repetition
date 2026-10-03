@@ -12,6 +12,7 @@ import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
 import CardCommentComponent from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment";
 import ContextSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/context-section/context-section";
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
+import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
 import {
     CardState,
@@ -81,15 +82,6 @@ export class CardContainer {
 
         this.setCustomHotKeyState(settings.useCustomHotkeys);
 
-        // Mobile: swiping left from the right edge skips the card, like the Skip button
-        if (Platform.isMobile || EmulatedPlatform().isMobile) {
-            attachRightEdgeSwipe(
-                this.view,
-                () => this.skipCardHandler(),
-                () => this.cardState === CardState.Front || this.cardState === CardState.Back,
-            );
-        }
-
         this.toolbar = new CardToolbarComponent(
             this.view,
             settings.showDeleteButtonInCardView,
@@ -118,6 +110,19 @@ export class CardContainer {
 
         this.content = this.scrollWrapper.createDiv();
         this.content.addClass("sr-content");
+
+        // Mobile: swiping left from the right edge skips the card, like the Skip button. The
+        // setting is read when a touch begins, so turning it off takes effect immediately.
+        if (Platform.isMobile || EmulatedPlatform().isMobile) {
+            const feedback = new SwipeFeedbackComponent(this.scrollWrapper);
+            attachRightEdgeSwipe(this.view, {
+                isActive: () =>
+                    settings.mobileSwipeToSkip &&
+                    (this.cardState === CardState.Front || this.cardState === CardState.Back),
+                onMove: (dx, armed) => feedback.move(dx, armed),
+                onRelease: (committed) => feedback.release(committed, () => this.skipCardHandler()),
+            });
+        }
 
         // Attached to the view, not the scroll wrapper. The wrapper is a `display: flex` with no
         // direction, so it lays its children out in a ROW, which left the box squeezed into a

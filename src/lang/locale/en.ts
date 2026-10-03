@@ -220,6 +220,12 @@ const en: IBaseLocale = {
     UI: "User Interface",
     OPEN_IN_TAB: "Open in new tab",
     OPEN_IN_TAB_DESC: "Turn this off to open the plugin in a modal window",
+    MOBILE_SETTINGS_PAGE: "Mobile",
+    GROUP_GESTURES: "Gestures",
+    SWIPE_TO_SKIP: "Swipe from the right edge to skip",
+    SWIPE_TO_SKIP_DESC:
+        'While reviewing, swipe left from the right edge of the screen to skip the card. Release once the indicator turns to "Release to skip"; release earlier to cancel.',
+    SWIPE_RELEASE_TO_SKIP: "Release to skip",
     STATUS_BAR_SETTINGS: "Status Bar",
     SHOW_STATUS_BAR: "Show status bar",
     SHOW_STATUS_BAR_DESC: "Turn this off to hide all status messages in Obsidian's status bar",
