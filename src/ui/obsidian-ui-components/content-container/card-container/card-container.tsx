@@ -9,6 +9,7 @@ import type SRPlugin from "src/main";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
+import CardCommentComponent from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment";
 import ContextSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/context-section/context-section";
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
@@ -34,6 +35,7 @@ export class CardContainer {
 
     private scrollWrapper: HTMLDivElement;
     private content: HTMLDivElement;
+    private cardComment: CardCommentComponent;
     private pendingClock: HTMLDivElement | null = null;
     private pendingResumeTimeout: number | null = null;
 
@@ -106,6 +108,8 @@ export class CardContainer {
         this.content = this.scrollWrapper.createDiv();
         this.content.addClass("sr-content");
 
+        this.cardComment = new CardCommentComponent(this.scrollWrapper, app, plugin);
+
         this.response = new ResponseSectionComponent(
             this.view,
             settings,
@@ -171,6 +175,7 @@ export class CardContainer {
 
         // Update card content
         await this.drawCardFrontContent(sessionData, settings);
+        this.cardComment.hide();
 
         // Update response buttons
         this.response.resetResponseButtons();
@@ -227,6 +232,7 @@ export class CardContainer {
         this.toolbar.setResetButtonDisabled(true);
         this.cardState = CardState.Front;
         this.content.empty();
+        this.cardComment.hide();
         this.response.hideAllButtons();
         this.pendingClock = this.content.createDiv({
             cls: "sr-centered",
@@ -254,6 +260,11 @@ export class CardContainer {
         };
 
         updatePendingClock();
+    }
+
+    /** Returns text typed into the comment box and clears it. */
+    public takeCardCommentText(): string {
+        return this.cardComment.takeText();
     }
 
     // #region -> Deck Info
@@ -372,6 +383,17 @@ export class CardContainer {
 
         // Evaluate cloze answers
         this._evaluateClozeAnswers();
+
+        const cardText: string = sessionData.currentQuestion.questionText.original;
+        const hostedInBlockquote: boolean = cardText
+            .split("\n")
+            .some((line) => line.trimStart().startsWith(">"));
+        if (reviewMode !== FlashcardReviewMode.Cram && !hostedInBlockquote) {
+            await this.cardComment.show(
+                sessionData.currentQuestion.cardCommentDefinition,
+                sessionData.currentNote.filePath,
+            );
+        }
 
         // Show response buttons
         this.response.showRatingButtons(
