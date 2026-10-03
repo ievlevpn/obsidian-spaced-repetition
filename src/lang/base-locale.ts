@@ -178,6 +178,11 @@ export interface IBaseLocale {
     UI: string;
     OPEN_IN_TAB: string;
     OPEN_IN_TAB_DESC: string;
+    MOBILE_SETTINGS_PAGE: string;
+    GROUP_GESTURES: string;
+    SWIPE_TO_SKIP: string;
+    SWIPE_TO_SKIP_DESC: string;
+    SWIPE_RELEASE_TO_SKIP: string;
     STATUS_BAR_SETTINGS: string;
     SHOW_STATUS_BAR: string;
     SHOW_STATUS_BAR_DESC: string;

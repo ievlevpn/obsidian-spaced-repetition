@@ -1,4 +1,9 @@
-import { attachRightEdgeSwipe, isRightEdgeSwipe, startsAtRightEdge } from "src/utils/edge-swipe";
+import {
+    attachRightEdgeSwipe,
+    EdgeSwipeHandlers,
+    isRightEdgeSwipe,
+    startsAtRightEdge,
+} from "src/utils/edge-swipe";
 
 const W = 390; // iPhone viewport width
 
@@ -46,65 +51,104 @@ describe("attachRightEdgeSwipe", () => {
         e.changedTouches = [t];
         return e;
     };
+    const setup = (active: () => boolean = () => true) => {
+        const parent = document.createElement("div");
+        const el = parent.appendChild(document.createElement("div"));
+        const handlers: EdgeSwipeHandlers & { onMove: jest.Mock; onRelease: jest.Mock } = {
+            isActive: active,
+            onMove: jest.fn(),
+            onRelease: jest.fn(),
+        };
+        const bubbled = jest.fn();
+        parent.addEventListener("touchstart", bubbled);
+        const detach = attachRightEdgeSwipe(el, handlers);
+        return { el, handlers, bubbled, detach };
+    };
 
     beforeEach(() => {
         Object.defineProperty(window, "innerWidth", { value: W, configurable: true });
     });
 
-    test("fires once for a swipe from the edge and keeps it from bubbling", () => {
-        const parent = document.createElement("div");
-        const el = parent.appendChild(document.createElement("div"));
-        const onSwipe = jest.fn();
-        const bubbled = jest.fn();
-        parent.addEventListener("touchstart", bubbled);
-        attachRightEdgeSwipe(el, onSwipe);
-
+    test("reports progress, arms past the threshold, and commits on release", () => {
+        const { el, handlers, bubbled } = setup();
         el.dispatchEvent(touch("touchstart", 385, 400));
-        el.dispatchEvent(touch("touchmove", 340, 402));
-        el.dispatchEvent(touch("touchend", 290, 405));
+        el.dispatchEvent(touch("touchmove", 360, 401));
+        el.dispatchEvent(touch("touchmove", 300, 403));
+        el.dispatchEvent(touch("touchend", 295, 404));
 
-        expect(onSwipe).toHaveBeenCalledTimes(1);
+        expect(handlers.onMove.mock.calls).toEqual([
+            [-25, false],
+            [-85, true],
+        ]);
+        expect(handlers.onRelease.mock.calls).toEqual([[true]]);
         expect(bubbled).not.toHaveBeenCalled();
     });
 
-    test("ignores touches away from the edge and lets them bubble", () => {
-        const parent = document.createElement("div");
-        const el = parent.appendChild(document.createElement("div"));
-        const onSwipe = jest.fn();
-        const bubbled = jest.fn();
-        parent.addEventListener("touchstart", bubbled);
-        attachRightEdgeSwipe(el, onSwipe);
+    test("releasing before the threshold, or after dragging back, does not commit", () => {
+        const { el, handlers } = setup();
+        el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchmove", 300, 400));
+        el.dispatchEvent(touch("touchmove", 370, 400)); // dragged back
+        el.dispatchEvent(touch("touchend", 370, 400));
+        expect(handlers.onRelease.mock.calls).toEqual([[false]]);
+    });
 
+    test("a vertical scroll starting at the edge is abandoned", () => {
+        const { el, handlers } = setup();
+        el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchmove", 383, 440));
+        el.dispatchEvent(touch("touchmove", 300, 445));
+        el.dispatchEvent(touch("touchend", 290, 445));
+        expect(handlers.onMove).not.toHaveBeenCalled();
+        expect(handlers.onRelease).not.toHaveBeenCalled();
+    });
+
+    test("a tap at the edge is neither a move nor a release", () => {
+        const { el, handlers } = setup();
+        el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchend", 386, 400));
+        expect(handlers.onMove).not.toHaveBeenCalled();
+        expect(handlers.onRelease).not.toHaveBeenCalled();
+    });
+
+    test("touches away from the edge are ignored and bubble", () => {
+        const { el, handlers, bubbled } = setup();
         el.dispatchEvent(touch("touchstart", 200, 400));
+        el.dispatchEvent(touch("touchmove", 100, 400));
         el.dispatchEvent(touch("touchend", 100, 400));
-
-        expect(onSwipe).not.toHaveBeenCalled();
+        expect(handlers.onMove).not.toHaveBeenCalled();
         expect(bubbled).toHaveBeenCalled();
     });
 
     test("does nothing while inactive, and stops after detaching", () => {
-        const el = document.createElement("div");
-        const onSwipe = jest.fn();
         let active = false;
-        const detach = attachRightEdgeSwipe(el, onSwipe, () => active);
-
+        const { el, handlers, detach } = setup(() => active);
         el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchmove", 300, 400));
         el.dispatchEvent(touch("touchend", 290, 400));
-        expect(onSwipe).not.toHaveBeenCalled();
+        expect(handlers.onRelease).not.toHaveBeenCalled();
 
         active = true;
         detach();
         el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchmove", 300, 400));
         el.dispatchEvent(touch("touchend", 290, 400));
-        expect(onSwipe).not.toHaveBeenCalled();
+        expect(handlers.onRelease).not.toHaveBeenCalled();
+    });
+
+    test("a cancelled touch springs back", () => {
+        const { el, handlers } = setup();
+        el.dispatchEvent(touch("touchstart", 385, 400));
+        el.dispatchEvent(touch("touchmove", 300, 400));
+        el.dispatchEvent(touch("touchcancel", 300, 400));
+        expect(handlers.onRelease.mock.calls).toEqual([[false]]);
     });
 
     test("a two-finger touch is not a swipe", () => {
-        const el = document.createElement("div");
-        const onSwipe = jest.fn();
-        attachRightEdgeSwipe(el, onSwipe);
+        const { el, handlers } = setup();
         el.dispatchEvent(touch("touchstart", 385, 400, 2));
+        el.dispatchEvent(touch("touchmove", 300, 400, 2));
         el.dispatchEvent(touch("touchend", 290, 400));
-        expect(onSwipe).not.toHaveBeenCalled();
+        expect(handlers.onMove).not.toHaveBeenCalled();
     });
 });

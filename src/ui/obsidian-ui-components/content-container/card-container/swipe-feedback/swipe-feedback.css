@@ -1,0 +1,72 @@
+/*
+ * Swipe-to-skip feedback. The host (the card's scroll wrapper) holds the content and the
+ * indicator, clips the content while it slides, and carries the swipe position as variables:
+ *   --sr-swipe-dx        horizontal offset of the finger (<= 0)
+ *   --sr-swipe-progress  0..1, how close the swipe is to committing
+ * Phases: .sr-swipe-dragging (follows the finger), .sr-swipe-out (slides away, 150ms),
+ * .sr-swipe-back (springs back, 200ms). Durations match swipe-feedback.tsx.
+ */
+.sr-swipe-host {
+    --sr-swipe-dx: 0px;
+    --sr-swipe-progress: 0;
+    position: relative;
+
+    &.sr-swipe-dragging > .sr-content,
+    &.sr-swipe-back > .sr-content {
+        transform: translateX(var(--sr-swipe-dx));
+        opacity: calc(1 - 0.4 * var(--sr-swipe-progress));
+    }
+
+    &.sr-swipe-back > .sr-content {
+        transform: translateX(0);
+        opacity: 1;
+        transition:
+            transform 200ms ease-out,
+            opacity 200ms ease-out;
+    }
+
+    &.sr-swipe-out > .sr-content {
+        transform: translateX(-100%);
+        opacity: 0;
+        transition:
+            transform 150ms ease-in,
+            opacity 150ms ease-in;
+    }
+}
+
+.sr-swipe-indicator {
+    position: absolute;
+    top: 50%;
+    right: var(--size-4-2);
+    transform: translate(calc((1 - var(--sr-swipe-progress)) * 100%), -50%);
+    opacity: var(--sr-swipe-progress);
+    pointer-events: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--size-4-1);
+    padding: var(--size-4-3);
+    border-radius: var(--radius-l);
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-s);
+    font-size: var(--font-ui-smaller);
+    transition:
+        background-color 120ms ease-out,
+        color 120ms ease-out;
+
+    & .sr-swipe-indicator-icon {
+        display: flex;
+    }
+
+    &.is-armed {
+        background-color: var(--interactive-accent);
+        color: var(--text-on-accent);
+    }
+
+    .sr-swipe-out > &,
+    .sr-swipe-back > & {
+        opacity: 0;
+        transition: opacity 150ms ease-out;
+    }
+}

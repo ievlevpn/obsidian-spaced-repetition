@@ -1,18 +1,31 @@
 // Swipe-from-the-right-edge gesture, used on mobile to skip the current card.
 //
-// A swipe counts when the touch starts within EDGE_WIDTH of the viewport's right border, travels
-// left at least MIN_DISTANCE, and stays mostly horizontal. While a touch that began at the edge is
-// being tracked, the events are kept from bubbling up, so Obsidian's own right-edge gesture (which
+// A touch that starts within EDGE_WIDTH of the viewport's right border is tracked. Once it moves
+// clearly left it is a swipe: every move reports the horizontal offset and whether releasing now
+// would commit (at least MIN_DISTANCE left, mostly horizontal). The decision is made on release.
+// A touch that turns out to be a vertical scroll is abandoned. While a touch that began at the
+// edge is tracked, its events are kept from bubbling, so Obsidian's own right-edge gesture (which
 // opens the right sidebar) does not also fire.
 
 export const EDGE_WIDTH = 30;
 export const MIN_DISTANCE = 60;
 // The vertical travel may be at most this fraction of the horizontal travel
 export const MAX_VERTICAL_RATIO = 0.6;
+// Movement below this (px) does not yet decide between a swipe and a scroll
+const SLOP = 10;
 
 export interface Point {
     x: number;
     y: number;
+}
+
+export interface EdgeSwipeHandlers {
+    // Checked when a touch begins; the gesture is ignored while it returns false
+    isActive: () => boolean;
+    // During a swipe: the horizontal offset (<= 0) and whether releasing now would commit
+    onMove: (dx: number, armed: boolean) => void;
+    // The touch ended or was abandoned; `committed` is true for a completed swipe
+    onRelease: (committed: boolean) => void;
 }
 
 /**
@@ -30,7 +43,7 @@ export function startsAtRightEdge(start: Point, viewportWidth: number): boolean 
  * Whether a touch that moved from `start` to `end` is a completed leftward edge swipe.
  *
  * @param start - Where the touch began
- * @param end - Where it ended
+ * @param end - Where it ended (or is now)
  * @param viewportWidth - The viewport width
  * @returns True for a swipe from the right edge, far enough left and mostly horizontal
  */
@@ -45,28 +58,31 @@ export function isRightEdgeSwipe(start: Point, end: Point, viewportWidth: number
 }
 
 /**
- * Call `onSwipe` when the user swipes left from the right edge over `el`.
+ * Track left swipes from the right edge over `el`.
  *
  * @param el - The element to listen on
- * @param onSwipe - Called once per completed swipe
- * @param isActive - Checked when a touch begins; the gesture is ignored while it returns false
+ * @param handlers - Activity check, progress and release callbacks
  * @returns A function that removes the listeners
  */
-export function attachRightEdgeSwipe(
-    el: HTMLElement,
-    onSwipe: () => void,
-    isActive: () => boolean = () => true,
-): () => void {
+export function attachRightEdgeSwipe(el: HTMLElement, handlers: EdgeSwipeHandlers): () => void {
     let start: Point | null = null;
+    let swiping = false;
 
     const point = (e: TouchEvent): Point => ({
         x: e.changedTouches[0].clientX,
         y: e.changedTouches[0].clientY,
     });
+    const finish = (committed: boolean) => {
+        const wasSwiping = swiping;
+        start = null;
+        swiping = false;
+        if (wasSwiping || committed) handlers.onRelease(committed);
+    };
 
     const onStart = (e: TouchEvent) => {
         start = null;
-        if (e.touches.length !== 1 || !isActive()) return;
+        swiping = false;
+        if (e.touches.length !== 1 || !handlers.isActive()) return;
         const p = point(e);
         if (!startsAtRightEdge(p, window.innerWidth)) return;
         start = p;
@@ -75,18 +91,27 @@ export function attachRightEdgeSwipe(
     const onMove = (e: TouchEvent) => {
         if (!start) return;
         e.stopPropagation();
-        // Once the movement is clearly a leftward swipe, keep the page from scrolling sideways
-        if (start.x - point(e).x > 10 && e.cancelable) e.preventDefault();
+        const p = point(e);
+        const dx = p.x - start.x;
+        const dy = p.y - start.y;
+        if (!swiping) {
+            if (Math.abs(dy) > SLOP && Math.abs(dy) > Math.abs(dx)) {
+                finish(false); // a vertical scroll, not a swipe
+                return;
+            }
+            if (-dx <= SLOP) return;
+            swiping = true;
+        }
+        if (e.cancelable) e.preventDefault();
+        handlers.onMove(Math.min(0, dx), isRightEdgeSwipe(start, p, window.innerWidth));
     };
     const onEnd = (e: TouchEvent) => {
         if (!start) return;
-        const begin = start;
-        start = null;
         e.stopPropagation();
-        if (isRightEdgeSwipe(begin, point(e), window.innerWidth)) onSwipe();
+        finish(swiping && isRightEdgeSwipe(start, point(e), window.innerWidth));
     };
     const onCancel = () => {
-        start = null;
+        if (start) finish(false);
     };
 
     el.addEventListener("touchstart", onStart, { passive: true });
