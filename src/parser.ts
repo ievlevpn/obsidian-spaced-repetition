@@ -145,8 +145,10 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             (s) => (s.start < start && s.end > start) || (s.start < end && s.end > end),
         );
     };
+    // Table rows and blockquote/callout lines only make sense together with their neighbours, so
+    // in an `inlineClozeLines` note they stay part of an ordinary card.
     const isInlineClozeLine = (i: number): boolean =>
-        (!!options.inlineClozeLines || /^\s*\+\s/.test(lines[i])) &&
+        (/^\s*\+\s/.test(lines[i]) || (!!options.inlineClozeLines && !/^\s*[|>]/.test(lines[i]))) &&
         isClozeLine(i) &&
         !crossesMathBoundary(i);
 

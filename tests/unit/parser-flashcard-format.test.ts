@@ -192,3 +192,22 @@ describe("HTML comments", () => {
         ]);
     });
 });
+
+describe("inlineClozeLines keeps tables and callouts together", () => {
+    const options: ParserOptions = { ...vault, inlineClozeLines: true };
+
+    test("a table with clozes stays one card", () => {
+        const text = "- {{a}} = 1\n| k | v |\n|---|---|\n| x | {{y}} |\n| z | {{w}} |\n---";
+        expect(cardsOf(text, options)).toEqual([
+            [CardType.Cloze, "- {{a}} = 1", 0, 0],
+            [CardType.Cloze, "| k | v |\n|---|---|\n| x | {{y}} |\n| z | {{w}} |", 1, 4],
+        ]);
+    });
+
+    test("a callout with a cloze stays one card", () => {
+        const text = "> [!comment]\n> the {{answer}}\n---";
+        expect(cardsOf(text, options)).toEqual([
+            [CardType.Cloze, "> [!comment]\n> the {{answer}}", 0, 1],
+        ]);
+    });
+});
