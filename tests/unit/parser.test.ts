@@ -826,14 +826,41 @@ test("Test footnote definitions are skipped entirely", () => {
         ),
     ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
 
-    // A definition directly under a multi line card must not be absorbed into it. Its text is
-    // correctly excluded (the card ends at "A [^sr-b7102e]"), but the end-of-card line number
-    // is computed from the following blank line as (blankLineIndex - 1), which lands on the
-    // footnote definition's own line (3) rather than the card's true last content line (2)
-    // when the two are adjacent with no blank line between them.
+    // A definition directly under a multi line card must not be absorbed into it, and the
+    // definition line TERMINATES the card, so lastLineNum is the card's true last content
+    // line (2) and not the definition's. It used to be inflated to one past the definition
+    // and its continuations, growing without bound with the definition's length.
     expect(
         parseT("F\n?\nA [^sr-b7102e]\n[^sr-b7102e]: - *2026-10-03:* x\n\n", parserOptions),
-    ).toEqual([[CardType.MultiLineBasic, "F\n?\nA [^sr-b7102e]", 0, 3]]);
+    ).toEqual([[CardType.MultiLineBasic, "F\n?\nA [^sr-b7102e]", 0, 2]]);
+
+    // ...including when the definition carries continuations, which previously pushed
+    // lastLineNum out by one plus the continuation count.
+    expect(
+        parseT(
+            "F\n?\nA\n[^sr-b7102e]: - *2026-10-03:* x\n    - *2026-10-04:* y\n      more\n\nafter\n",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.MultiLineBasic, "F\n?\nA", 0, 2]]);
+
+    // A definition line INSIDE a card's text region ends the card there rather than being
+    // dropped mid-card. Dropping it left questionText.original non-contiguous in the note,
+    // so MultiLineTextFinder missed forever and the card's schedule silently never
+    // persisted. The card that remains is contiguous and therefore writable.
+    // The card ends at the definition exactly as it would at a blank line, so the answer
+    // side is empty rather than silently stitched across the definition.
+    const insideNote: string = "How do you write a footnote?\n?\n[^1]: the text\nand more answer\n";
+    expect(parseT(insideNote, parserOptions)).toEqual([
+        [CardType.MultiLineBasic, "How do you write a footnote?\n?", 0, 1],
+    ]);
+    expect(insideNote).toContain("How do you write a footnote?\n?");
+
+    // The same shape with content before the definition keeps that part as the card, and the
+    // card text is a contiguous slice of the note.
+    const noteText: string = "F\n?\nA line\n[^1]: the text\nand more answer\n";
+    const contiguous: [CardType, string, number, number][] = parseT(noteText, parserOptions);
+    expect(contiguous).toEqual([[CardType.MultiLineBasic, "F\n?\nA line", 0, 2]]);
+    expect(noteText).toContain(contiguous[0][1]);
 
     // Multi-entry definitions, including indented continuations, are skipped wholesale
     expect(

@@ -243,6 +243,37 @@ export class MultiLineTextFinder {
         return result;
     }
 
+    /**
+     * How many places in `sourceText` the whole of `searchText` matches, using the same
+     * trimmed line-by-line comparison as `find`. Matches are counted non-overlapping, so
+     * `find` returning non-null implies a count of at least 1.
+     *
+     * This exists so a caller can tell whether `findAndReplace`'s first-match-wins choice is
+     * actually a choice. It deliberately does NOT change `find` or `findAndReplace`, whose
+     * semantics every schedule write depends on.
+     */
+    static countMatches(sourceText: string[], searchText: string[]): number {
+        if (searchText.length === 0) return 0;
+        let count: number = 0;
+        let searchIdx: number = 0;
+        const maxSearchIdx: number = searchText.length - 1;
+        for (let sourceIdx = 0; sourceIdx < sourceText.length; sourceIdx++) {
+            const sourceLine: string = sourceText[sourceIdx].trim();
+            const searchLine: string = searchText[searchIdx].trim();
+            if (searchLine === sourceLine) {
+                if (searchIdx === maxSearchIdx) {
+                    count++;
+                    searchIdx = 0;
+                } else {
+                    searchIdx++;
+                }
+            } else {
+                searchIdx = 0;
+            }
+        }
+        return count;
+    }
+
     static find(sourceText: string[], searchText: string[]): number | null {
         let result: number = null;
         let searchIdx: number = 0;

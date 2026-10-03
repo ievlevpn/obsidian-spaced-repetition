@@ -21,7 +21,13 @@ import {
     generateCardCommentLabel,
 } from "src/utils/card-comment";
 import { collectCardCommentLabels, findFootnoteDefinition } from "src/utils/note-footnotes";
-import { cyrb53, MultiLineTextFinder, stringTrimStart, TextDirection } from "src/utils/strings";
+import {
+    cyrb53,
+    MultiLineTextFinder,
+    splitTextIntoLineArray,
+    stringTrimStart,
+    TextDirection,
+} from "src/utils/strings";
 
 export enum CardType {
     SingleLineBasic,
@@ -309,6 +315,26 @@ export class Question {
         this.pendingCardCommentText = text;
         this.pendingCardCommentDate = date;
         this.hasChanged = true;
+    }
+
+    /** Throws away any staged comment without writing it. */
+    discardPendingCardComment(): void {
+        this.pendingCardCommentText = null;
+        this.pendingCardCommentDate = null;
+    }
+
+    /**
+     * True when this question's text occurs in more than one place in the note, so the write
+     * target cannot be identified: MultiLineTextFinder takes the first match, which for two
+     * byte-identical cards is not necessarily this one.
+     */
+    isTextAmbiguousWithinNote(noteText: string): boolean {
+        return (
+            MultiLineTextFinder.countMatches(
+                splitTextIntoLineArray(noteText),
+                splitTextIntoLineArray(this.questionText.original),
+            ) > 1
+        );
     }
 
     /**

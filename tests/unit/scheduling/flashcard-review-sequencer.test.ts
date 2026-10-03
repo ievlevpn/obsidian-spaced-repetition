@@ -1075,6 +1075,107 @@ describe("card comments", () => {
         expect(await c.file.read()).toBe("totally different note\n");
     });
 
+    // I2: resolveCardComment allocates the label BEFORE updateQuestionWithinNoteText can
+    // report a miss. If the label is not rolled back, the next successful write - a
+    // short-term requeue, or Edit Card, which writes unconditionally - emits "[^sr-xxxxxx]"
+    // into the user's prose with no definition anywhere.
+    test("a write miss leaves no label behind for the next write to orphan", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+        const question = c.reviewSequencer.currentQuestion;
+        expect(question.questionText.cardCommentRef).toBeNull();
+
+        // The note changes under us mid-review, so the card's text can no longer be found
+        c.file.content = "totally different note\n";
+        c.reviewSequencer.setPendingCardComment("orphan risk");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(question.questionText.cardCommentRef).toBeNull();
+
+        // The note comes back and the same question object is written again, with no comment
+        c.file.content = "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n";
+        await question.writeQuestion(c.settings);
+
+        expect(await c.file.read()).not.toContain("[^sr-");
+    });
+
+    test("a write miss does not strand a label already written to the note", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* earlier",
+        );
+        const question = c.reviewSequencer.currentQuestion;
+        expect(question.questionText.cardCommentRef).toEqual("sr-a3f91c");
+
+        c.file.content = "totally different note\n";
+        c.reviewSequencer.setPendingCardComment("lost to the miss");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        // The pre-existing label is kept: it has a definition, so it is not an orphan
+        expect(question.questionText.cardCommentRef).toEqual("sr-a3f91c");
+    });
+
+    // Spec testing item 10. The spec claimed first-match-wins was "not made worse" by this
+    // feature; it was, because a mis-attributed comment plants a visible marker and a dated
+    // entry on the wrong card permanently. The write path now refuses the comment instead.
+    describe("two identical cards in one note", () => {
+        const twoIdentical: string =
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->";
+
+        test("a comment is refused rather than attributed to the wrong copy", async () => {
+            const c: TestContext = await contextWith(twoIdentical);
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            c.reviewSequencer.setPendingCardComment("which card is this?");
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            // No reference, no definition: nothing was planted on the wrong card.
+            expect(fileText).not.toContain("[^sr-");
+            expect(warnSpy).toHaveBeenCalled();
+            warnSpy.mockRestore();
+        });
+
+        test("identical UNSCHEDULED cards never accumulate anything, however many comments", async () => {
+            // The scheduled pair above stops being ambiguous as soon as the first review
+            // gives one of them a different schedule comment. Unscheduled cards stay
+            // byte-identical for as long as the user only ever comments on them, so this is
+            // the shape where a mis-attribution would compound.
+            const c: TestContext = await contextWith("#flashcards Q1::A1\n\n#flashcards Q1::A1");
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            for (const text of ["one", "two", "three"]) {
+                c.reviewSequencer.setPendingCardComment(text);
+                await c.reviewSequencer.flushPendingCardComment();
+                await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+            }
+
+            expect(await c.file.read()).toEqual("#flashcards Q1::A1\n\n#flashcards Q1::A1");
+            warnSpy.mockRestore();
+        });
+
+        test("the schedules still persist, exactly as they did before the comment feature", async () => {
+            const c: TestContext = await contextWith(twoIdentical);
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toContain("<!--SR:!2023-09-06,0,");
+            warnSpy.mockRestore();
+        });
+
+        test("once the cards differ, commenting works again", async () => {
+            const c: TestContext = await contextWith(
+                "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q2::A2 <!--SR:!2023-09-02,4,270-->",
+            );
+
+            c.reviewSequencer.setPendingCardComment("fine on a unique card");
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toMatch(/\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* fine on a unique card/);
+        });
+    });
+
     test("blank staged text emits no reference on the card", async () => {
         const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
 
