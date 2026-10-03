@@ -6,6 +6,7 @@ import {
     includedSeparator,
     literalStringReplace,
     MultiLineTextFinder,
+    removeCommonIndent,
     splitNoteIntoFrontmatterAndContent,
     splitTextIntoLineArray,
     stringTrimStart,
@@ -244,6 +245,53 @@ describe("stringTrimStart", () => {
         expect(stringTrimStart("\n any text here")).toEqual(["\n ", "any text here"]);
         expect(stringTrimStart(" \nany text here")).toEqual([" \n", "any text here"]);
         expect(stringTrimStart(" \n any text here")).toEqual([" \n ", "any text here"]);
+    });
+});
+
+describe("removeCommonIndent", () => {
+    test("Empty string", () => {
+        expect(removeCommonIndent("")).toEqual("");
+        expect(removeCommonIndent(undefined)).toEqual("");
+    });
+
+    test("No indentation", () => {
+        expect(removeCommonIndent("any text here")).toEqual("any text here");
+        expect(removeCommonIndent("line 1\n  line 2")).toEqual("line 1\n  line 2");
+    });
+
+    test("Nested list item indented 4 spaces is not left as a code block", () => {
+        expect(removeCommonIndent("    1. <span style='color:#2196f3'>answer</span>")).toEqual(
+            "1. <span style='color:#2196f3'>answer</span>",
+        );
+    });
+
+    test("Tab-indented line", () => {
+        expect(removeCommonIndent("\t- item")).toEqual("- item");
+    });
+
+    test("Common indentation removed, relative indentation kept", () => {
+        expect(removeCommonIndent("    - item\n        - sub-item\n    - item 2")).toEqual(
+            "- item\n    - sub-item\n- item 2",
+        );
+    });
+
+    test("Mixed depths: shared indentation removed, then the first line trimmed", () => {
+        expect(removeCommonIndent("    shallow\n        deep")).toEqual("shallow\n    deep");
+        expect(removeCommonIndent("        deep\n    shallow")).toEqual("deep\nshallow");
+    });
+
+    test("Blank and whitespace-only lines are ignored when finding the indent", () => {
+        expect(removeCommonIndent("    line 1\n\n  \n    line 2")).toEqual("line 1\n\n\nline 2");
+    });
+
+    test("Leading blank lines are trimmed, as before", () => {
+        expect(removeCommonIndent("\n    text")).toEqual("text");
+    });
+
+    test("Indentation inside a fenced code block keeps its relative depth", () => {
+        expect(removeCommonIndent("    ```\n    if x:\n        y\n    ```")).toEqual(
+            "```\nif x:\n    y\n```",
+        );
     });
 });
 
