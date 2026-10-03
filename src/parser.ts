@@ -30,11 +30,21 @@ export class ParsedQuestionInfo {
     firstLineNum: number;
     lastLineNum: number;
 
-    constructor(cardType: CardType, text: string, firstLineNum: number, lastLineNum: number) {
+    // A single-line card: `:::` / `::::`, or an inline cloze line
+    isInline: boolean;
+
+    constructor(
+        cardType: CardType,
+        text: string,
+        firstLineNum: number,
+        lastLineNum: number,
+        isInline: boolean = false,
+    ) {
         this.cardType = cardType;
         this.text = text;
         this.firstLineNum = firstLineNum;
         this.lastLineNum = lastLineNum;
+        this.isInline = isInline;
     }
 
     isQuestionLineNum(lineNum: number): boolean {
@@ -267,7 +277,7 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
                 }
             }
 
-            cards.push(new ParsedQuestionInfo(inlineType, inlineText, inlineFirst, i));
+            cards.push(new ParsedQuestionInfo(inlineType, inlineText, inlineFirst, i, true));
 
             cardType = null;
             cardText = "";

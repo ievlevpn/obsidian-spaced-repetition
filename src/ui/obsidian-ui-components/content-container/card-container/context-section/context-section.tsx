@@ -29,6 +29,11 @@ export default class ContextSectionComponent {
         this.contextSection.setText(
             ` ${this._formatQuestionContextText(currentQuestion.questionContext, currentNote)}`,
         );
+
+        // Inline cloze cards in a list: the lead-in line and parent items, below the breadcrumb
+        for (const line of currentQuestion.listContext ?? []) {
+            this.contextSection.createDiv({ cls: "sr-list-context", text: line });
+        }
     }
 
     private _formatQuestionContextText(questionContext: string[], currentNote: Note): string {

@@ -5,6 +5,12 @@
     padding-bottom: var(--size-4-2);
 }
 
+.sr-list-context {
+    font-style: normal;
+    color: var(--text-muted);
+    padding-top: var(--size-4-1);
+}
+
 @media only screen and (orientation: landscape) {
     .is-phone .sr-context {
         display: none;

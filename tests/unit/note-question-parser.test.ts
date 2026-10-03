@@ -975,3 +975,24 @@ describe("hasInlineClozeProperty", () => {
         expect(hasInlineClozeProperty(frontmatter)).toBe(expected);
     });
 });
+
+describe("list context of inline cloze cards", () => {
+    const settings: SRSettings = {
+        ...DEFAULT_SETTINGS,
+        clozePatterns: ["{{[123;;]answer[;;hint]}}"],
+        multilineCardEndMarker: "---",
+    };
+    const parser: NoteQuestionParser = createTestNoteQuestionParser(settings);
+
+    test("an inline cloze card gets the lead-in line; a region card gets none", async () => {
+        const noteText =
+            "#flashcards\nFaux amis:\n+ {{actuellement}} = currently\n---\nProse with {{a}}.\n";
+        const questions: Question[] = await parser.createQuestionList(
+            new UnitTestSRFile(noteText),
+            TextDirection.Ltr,
+            null,
+            true,
+        );
+        expect(questions.map((q) => q.listContext)).toEqual([["Faux amis:"], []]);
+    });
+});

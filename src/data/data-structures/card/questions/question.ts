@@ -247,6 +247,9 @@ export class Question {
     topicPathList: TopicPathList;
     questionText: QuestionText;
     questionContext: string[];
+    // Display-only lines shown greyed above an inline cloze card in a list (parent items and the
+    // lead-in line above the list); never part of the card text
+    listContext: string[] = [];
     cards: Card[];
     hasChanged: boolean;
 

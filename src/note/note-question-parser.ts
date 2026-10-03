@@ -3,7 +3,7 @@ import { TagCache } from "obsidian";
 import { DataStore } from "src/data/data-store/base/data-store";
 import { RepItemStorageInfo } from "src/data/data-store/base/rep-item-storage-info";
 import { Card } from "src/data/data-structures/card/card";
-import { Question, QuestionText } from "src/data/data-structures/card/questions/question";
+import { CardType, Question, QuestionText } from "src/data/data-structures/card/questions/question";
 import {
     CardFrontBack,
     CardFrontBackUtil,
@@ -14,6 +14,7 @@ import { frontmatterTagPseudoLineNum } from "src/data/data-structures/file/sr-fi
 import { SettingsUtil, SRSettings } from "src/data/settings";
 import { parse, ParsedQuestionInfo, ParserOptions } from "src/parser";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
+import { getListContext } from "src/utils/list-context";
 import { collectCardCommentDefinitions } from "src/utils/note-footnotes";
 import {
     splitNoteIntoFrontmatterAndContent,
@@ -184,6 +185,9 @@ export class NoteQuestionParser {
             textDirection,
             questionContext,
         );
+        if (parsedQuestionInfo.isInline && parsedQuestionInfo.cardType === CardType.Cloze) {
+            result.listContext = getListContext(this.noteLines, parsedQuestionInfo.firstLineNum);
+        }
         return result;
     }
 
