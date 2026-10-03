@@ -18,6 +18,7 @@ import {
     SessionData,
 } from "src/ui/obsidian-ui-components/content-container/content-manager";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
+import { attachRightEdgeSwipe } from "src/utils/edge-swipe";
 import { escapeHtml } from "src/utils/escape-html";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
@@ -79,6 +80,15 @@ export class CardContainer {
         this.view.addClasses(["sr-container", "sr-card-container", "sr-is-hidden"]);
 
         this.setCustomHotKeyState(settings.useCustomHotkeys);
+
+        // Mobile: swiping left from the right edge skips the card, like the Skip button
+        if (Platform.isMobile || EmulatedPlatform().isMobile) {
+            attachRightEdgeSwipe(
+                this.view,
+                () => this.skipCardHandler(),
+                () => this.cardState === CardState.Front || this.cardState === CardState.Back,
+            );
+        }
 
         this.toolbar = new CardToolbarComponent(
             this.view,
