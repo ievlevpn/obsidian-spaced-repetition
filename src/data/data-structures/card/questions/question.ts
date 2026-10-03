@@ -14,6 +14,7 @@ import {
 import { SRSettings } from "src/data/settings";
 import { Note } from "src/note/note";
 import { ParsedQuestionInfo } from "src/parser";
+import { extractCardCommentRef, formatCardCommentRef } from "src/utils/card-comment";
 import { cyrb53, MultiLineTextFinder, stringTrimStart, TextDirection } from "src/utils/strings";
 
 export enum CardType {
@@ -98,8 +99,13 @@ export class QuestionText {
     // If present, then first character is "^"
     obsidianBlockId: string;
 
+    // Label of the footnote holding the user's dated notes about this card, e.g. "sr-a3f91c",
+    // or null when the card has no comment. Deliberately excluded from textHash.
+    cardCommentRef: string | null;
+
     // Hash of string  (topicPath + actualQuestion)
-    // Explicitly excludes the HTML comment with the scheduling info
+    // Explicitly excludes the HTML comment with the scheduling info, the obsidian block ID,
+    // and the card comment reference
     textHash: string;
 
     constructor(
@@ -108,12 +114,14 @@ export class QuestionText {
         actualQuestion: string,
         textDirection: TextDirection,
         blockId: string,
+        cardCommentRef: string | null = null,
     ) {
         this.original = original;
         this.topicPathWithWs = topicPathWithWs;
         this.actualQuestion = actualQuestion;
         this.textDirection = textDirection;
         this.obsidianBlockId = blockId;
+        this.cardCommentRef = cardCommentRef;
 
         // The hash is generated based on the topic and question, explicitly not the schedule or obsidian block ID
         this.textHash = cyrb53(this.formatTopicAndQuestion());
@@ -128,15 +136,25 @@ export class QuestionText {
         textDirection: TextDirection,
         settings: SRSettings,
     ): QuestionText {
-        const [topicPathWithWs, actualQuestion, blockId] = this.splitText(original, settings);
+        const [topicPathWithWs, actualQuestion, blockId, cardCommentRef] = this.splitText(
+            original,
+            settings,
+        );
 
-        return new QuestionText(original, topicPathWithWs, actualQuestion, textDirection, blockId);
+        return new QuestionText(
+            original,
+            topicPathWithWs,
+            actualQuestion,
+            textDirection,
+            blockId,
+            cardCommentRef,
+        );
     }
 
     static splitText(
         original: string,
         settings: SRSettings,
-    ): [TopicPathWithWs | null, string, string] {
+    ): [TopicPathWithWs | null, string, string, string | null] {
         const originalWithoutSR = DataStore.getInstance().removeScheduleInfo(original);
         let actualQuestion: string = originalWithoutSR.trimEnd();
 
@@ -154,14 +172,37 @@ export class QuestionText {
             // actualQuestion - Question [whitespace blockId]
             let postTopicPathWs: string;
             [postTopicPathWs, actualQuestion] = stringTrimStart(cardText3);
+            // Trailing whitespace must go here too, or endsWithCodeBlock() is false for a
+            // tagged card ending in a fence and the schedule is written onto the closing
+            // fence, permanently breaking write-back for that card.
+            actualQuestion = actualQuestion.trimEnd();
             if (!settings.convertFoldersToDecks) {
                 topicPathWithWs = new TopicPathWithWs(topicPath, preTopicPathWs, postTopicPathWs);
             }
         }
 
-        // actualQuestion - Question [whitespace blockId]
-        const [strippedQuestion, blockId] = this.extractObsidianBlockId(actualQuestion);
-        return [topicPathWithWs, strippedQuestion, blockId];
+        // The line can carry both an Obsidian block id and this plugin's footnote reference,
+        // and formatForNote orders them differently in the same-line and own-line cases.
+        // Strip whichever matches at the end, repeatedly, so order never matters.
+        let blockId: string | null = null;
+        let cardCommentRef: string | null = null;
+        for (;;) {
+            const [withoutBlockId, foundBlockId] = this.extractObsidianBlockId(actualQuestion);
+            if (foundBlockId) {
+                blockId = foundBlockId;
+                actualQuestion = withoutBlockId;
+                continue;
+            }
+            const [withoutRef, foundRef] = extractCardCommentRef(actualQuestion);
+            if (foundRef) {
+                cardCommentRef = foundRef;
+                actualQuestion = withoutRef;
+                continue;
+            }
+            break;
+        }
+
+        return [topicPathWithWs, actualQuestion, blockId, cardCommentRef];
     }
 
     static extractObsidianBlockId(text: string): [string, string] {
@@ -228,9 +269,19 @@ export class Question {
         this.cards.forEach((card) => (card.question = this));
     }
 
+    /** Records the footnote label for this card's comment. */
+    setCardCommentRef(label: string): void {
+        if (this.questionText.cardCommentRef === label) return;
+        this.questionText.cardCommentRef = label;
+        this.hasChanged = true;
+    }
+
     formatForNote(settings: SRSettings): string {
         let result: string = this.questionText.formatTopicAndQuestion();
         const blockId: string = this.questionText.obsidianBlockId;
+        const ref: string = this.questionText.cardCommentRef
+            ? formatCardCommentRef(this.questionText.cardCommentRef)
+            : "";
         const hasSchedule: boolean = this.cards.some((card) => card.hasSchedule);
         if (hasSchedule) {
             result = result.trimEnd();
@@ -247,21 +298,26 @@ export class Question {
                     result += `${result.endsWith("\n") ? "" : "\n"}${SR_METADATA_CALLOUT} \n> `;
                 }
 
+                // The reference travels immediately before the schedule comment, so it
+                // inherits the plugin's own safe placement and can never land inside a
+                // code fence or a math block.
+                const scheduleFragment: string = ref ? `${ref} ${scheduleHtml}` : scheduleHtml;
+
                 if (blockId) {
                     if (
                         this.isCardCommentsOnSameLine(settings) ||
                         isScheduleInSRMetadataCallout ||
                         settings.useCalloutsForSchedulingComments
                     )
-                        result += ` ${scheduleHtml} ${blockId}`;
-                    else result += ` ${blockId}\n${scheduleHtml}`;
+                        result += ` ${scheduleFragment} ${blockId}`;
+                    else result += ` ${blockId}\n${scheduleFragment}`;
                 } else {
                     result +=
                         this.getHtmlCommentSeparator(
                             settings,
                             isScheduleInSRMetadataCallout ||
                                 settings.useCalloutsForSchedulingComments,
-                        ) + scheduleHtml;
+                        ) + scheduleFragment;
                 }
             } else {
                 if (blockId) {
@@ -269,8 +325,13 @@ export class Question {
                 }
             }
         } else {
-            // No schedule, so the block ID always comes after the question text, without anything after it
+            // No schedule, so the block ID always comes after the question text
             if (blockId) result += ` ${blockId}`;
+            // The reference still uses the placement the schedule would have used
+            if (ref) {
+                result = result.trimEnd();
+                result += this.isCardCommentsOnSameLine(settings) ? ` ${ref}` : `\n${ref}`;
+            }
         }
         return result;
     }
