@@ -91,6 +91,45 @@ export function stringTrimStart(str: string): [string, string] {
     return [ws, trimmed];
 }
 
+/**
+ * Prepares card text for rendering: removes the indentation shared by all non-blank lines,
+ * then any remaining leading whitespace.
+ *
+ * A card taken from a nested list item keeps its indentation (e.g. "    1. {{answer}}"), and
+ * Markdown renders text indented by 4+ spaces as a code block. Removing only the shared
+ * indentation keeps the relative indentation of nested lines within the card.
+ *
+ * @param text The card text (front or back).
+ * @returns The text with its common indentation removed and its start trimmed.
+ */
+export function removeCommonIndent(text: string): string {
+    if (!text) {
+        return "";
+    }
+    const lines: string[] = text.split("\n");
+    let common: string | null = null;
+    for (const line of lines) {
+        if (line.trim().length === 0) continue;
+        const indent: string = line.match(/^[ \t]*/)[0];
+        if (common === null) {
+            common = indent;
+        } else {
+            let i = 0;
+            while (i < common.length && i < indent.length && common[i] === indent[i]) i++;
+            common = common.substring(0, i);
+        }
+        if (common.length === 0) break;
+    }
+    if (!common) {
+        return text.trimStart();
+    }
+    const prefix: string = common;
+    return lines
+        .map((line) => (line.startsWith(prefix) ? line.substring(prefix.length) : line.trimStart()))
+        .join("\n")
+        .trimStart();
+}
+
 // This returns [frontmatter, content]
 //
 // The returned content has the same number of lines as the supplied str string, but with the

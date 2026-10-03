@@ -21,6 +21,7 @@ import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirma
 import { escapeHtml } from "src/utils/escape-html";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
+import { removeCommonIndent } from "src/utils/strings";
 
 // TODO: Refactor cloze rendering into the renderers file
 export class CardContainer {
@@ -224,7 +225,7 @@ export class CardContainer {
         );
 
         await wrapper.renderMarkdownWrapper(
-            sessionData.cardData.currentCard.front.trimStart(),
+            removeCommonIndent(sessionData.cardData.currentCard.front),
             this.content,
             sessionData.currentQuestion.questionText.textDirection,
             // sessionData.cardData.currentCardState
@@ -380,7 +381,7 @@ export class CardContainer {
             sessionData.currentNote.filePath,
         );
         await wrapper.renderMarkdownWrapper(
-            sessionData.cardData.currentCard.back,
+            removeCommonIndent(sessionData.cardData.currentCard.back),
             this.content,
             sessionData.currentQuestion.questionText.textDirection,
             // sessionData.cardData.currentCardState,
