@@ -1085,6 +1085,207 @@ describe("card comments", () => {
     });
 });
 
+// Spec testing item 4: "three successive rated reviews leave the note byte-identical apart
+// from the schedule and the new entries. This is the test the archived design failed."
+//
+// The assertion is byte equality of the note's *skeleton* - everything the comment feature is
+// not allowed to touch - against the skeleton of the original note, after three
+// write/re-parse cycles, for every card shape, under BOTH cardCommentOnSameLine values.
+// Four `toContain` fragments on one card shape under one setting is what let the unbounded
+// accumulation bug through six task reviews; this is the check that catches it.
+describe("card comment convergence", () => {
+    const SR_DEFINITION_LINE = /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/;
+    const REF_TOKEN_GLOBAL = /\[\^sr-[0-9a-f]{6}\]/g;
+
+    /**
+     * Reduces a note to the bytes a comment write must leave alone:
+     *   - the trailing `[^sr-...]` definition block (and the blank lines introducing it) is cut,
+     *   - every footnote reference token is removed along with the one space or newline that
+     *     separates it from its neighbour (the token+trailing-space rule first, so a token
+     *     sitting on its own line in front of a schedule comment gives the line back rather
+     *     than swallowing the newline),
+     *   - schedule comments are masked, since their dates legitimately change every review.
+     * Trailing newlines are normalised because the first append collapses them (known Minor,
+     * cosmetic and one-time per note); everything else must match byte for byte.
+     */
+    function skeleton(text: string): string {
+        const lines: string[] = text.replaceAll("\r\n", "\n").split("\n");
+        let cut: number = lines.findIndex((line) => SR_DEFINITION_LINE.test(line));
+        if (cut >= 0) {
+            while (cut > 0 && lines[cut - 1].trim().length === 0) cut--;
+            lines.length = cut;
+        }
+        return lines
+            .join("\n")
+            .replace(/\[\^sr-[0-9a-f]{6}\] /g, "")
+            .replace(/[ \n]\[\^sr-[0-9a-f]{6}\]/g, "")
+            .replace(/<!--SR:[^>]*-->/g, "<!--SR-->")
+            .replace(/\n+$/, "");
+    }
+
+    /** The lines of the note's sr- definition block, or [] if there is none. */
+    function definitionBlock(text: string): string[] {
+        const lines: string[] = text.replaceAll("\r\n", "\n").split("\n");
+        const start: number = lines.findIndex((line) => SR_DEFINITION_LINE.test(line));
+        if (start < 0) return [];
+        return lines.slice(start).filter((line) => line.trim().length > 0);
+    }
+
+    function countMatches(text: string, re: RegExp): number {
+        return (text.match(re) ?? []).length;
+    }
+
+    const userFootnotes: string[] = [
+        "",
+        "prose after the card",
+        "",
+        "[^1]: the user's own numbered footnote",
+        "    with an indented continuation line",
+        "[^note]: a named footnote of the user's",
+        "",
+    ];
+
+    interface Shape {
+        name: string;
+        /** Card text with no schedule comment yet. */
+        card: string[];
+    }
+
+    const shapes: Shape[] = [
+        { name: "an inline card", card: ["#flashcards Q1::A1"] },
+        {
+            name: "a multi-line card",
+            card: ["#flashcards", "What is the front?", "?", "This is the back", "and more back"],
+        },
+        { name: "a cloze card", card: ["#flashcards " + clozeQuestion1] },
+        {
+            name: "a card ending in a code fence",
+            card: [
+                "#flashcards",
+                "How do you print in python?",
+                "?",
+                "```python",
+                "print(1)",
+                "```",
+            ],
+        },
+        {
+            name: "a card with an Obsidian block id",
+            card: ["#flashcards Q1::A1 ^block-id-1"],
+        },
+    ];
+
+    function noteFor(cardLines: string[]): string {
+        return ["# Heading", "", ...cardLines, ...userFootnotes].join("\n");
+    }
+
+    function contextFor(text: string, onSameLine: boolean): TestContext {
+        const settings: SRSettings = { ...DEFAULT_SETTINGS };
+        settings.cardCommentOnSameLine = onSameLine;
+        return TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            settings,
+            text,
+            moment().millisecond().toString() + Math.random().toString(),
+        );
+    }
+
+    for (const onSameLine of [true, false]) {
+        describe(`cardCommentOnSameLine: ${onSameLine}`, () => {
+            for (const shape of shapes) {
+                // ReviewResponse.Again, not Good: Good pushes the due date past the static
+                // test date (2023-09-06), the card leaves the queue, and currentCard is null
+                // on the second iteration. Again always re-dues the card today.
+                test(`${shape.name}, three rated reviews with a comment each`, async () => {
+                    const c: TestContext = contextFor(noteFor(shape.card), onSameLine);
+                    await c.setSequencerDeckTreeFromOriginalText();
+
+                    // Baseline: one rated review with NO comment. This lets the plugin itself
+                    // decide where the schedule comment goes for this shape, so the test
+                    // measures only what the COMMENT feature adds and never hard-codes a
+                    // schedule layout that might not be the plugin's own.
+                    await c.reviewSequencer.processReview(ReviewResponse.Again);
+                    const original: string = await c.file.read();
+                    await c.setSequencerDeckTreeFromOriginalTextWith(original);
+                    expect(original).not.toContain("[^sr-");
+
+                    const texts: string[] = ["first thought", "second thought", "third thought"];
+                    for (const text of texts) {
+                        expect(c.reviewSequencer.hasCurrentCard).toEqual(true);
+                        c.reviewSequencer.setPendingCardComment(text);
+                        await c.reviewSequencer.processReview(ReviewResponse.Again);
+                        await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+                    }
+
+                    const final: string = await c.file.read();
+
+                    // Nothing outside the schedule comment and the definition block moved.
+                    expect(skeleton(final)).toEqual(skeleton(original));
+                    // Exactly one reference on the card, exactly one definition.
+                    expect(countMatches(final, REF_TOKEN_GLOBAL)).toEqual(2);
+                    expect(countMatches(final, /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/gm)).toEqual(1);
+                    // All three entries, in order, in that one definition.
+                    const block: string[] = definitionBlock(final);
+                    expect(block).toHaveLength(3);
+                    texts.forEach((text, idx) =>
+                        expect(block[idx]).toContain(`*2023-09-06:* ${text}`),
+                    );
+                });
+
+                // The unscheduled card is the branch with no schedule comment for the
+                // reference to sit in front of, so the reference has to stand on its own.
+                // flushPendingCardComment is the real path that reaches it: the user types a
+                // comment and then skips the card, or closes the view, without rating it.
+                test(`${shape.name} with no schedule, three comment flushes`, async () => {
+                    const original: string = noteFor(shape.card);
+                    const c: TestContext = contextFor(original, onSameLine);
+                    await c.setSequencerDeckTreeFromOriginalText();
+
+                    const texts: string[] = ["alpha", "beta", "gamma"];
+                    for (const text of texts) {
+                        expect(c.reviewSequencer.hasCurrentCard).toEqual(true);
+                        c.reviewSequencer.setPendingCardComment(text);
+                        await c.reviewSequencer.flushPendingCardComment();
+                        await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+                    }
+
+                    const final: string = await c.file.read();
+
+                    expect(skeleton(final)).toEqual(skeleton(original));
+                    expect(countMatches(final, REF_TOKEN_GLOBAL)).toEqual(2);
+                    expect(countMatches(final, /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/gm)).toEqual(1);
+                    const block: string[] = definitionBlock(final);
+                    expect(block).toHaveLength(3);
+                    texts.forEach((text, idx) =>
+                        expect(block[idx]).toContain(`*2023-09-06:* ${text}`),
+                    );
+                });
+            }
+
+            // Spec testing item 2: a full parse -> write -> re-parse round trip, which was
+            // only covered at the QuestionText/formatForNote level under this setting.
+            test("round trip: the re-parsed card drops the reference from its own text", async () => {
+                const original: string = noteFor([
+                    "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+                ]);
+                const c: TestContext = contextFor(original, onSameLine);
+                await c.setSequencerDeckTreeFromOriginalText();
+
+                c.reviewSequencer.setPendingCardComment("a thought");
+                await c.reviewSequencer.processReview(ReviewResponse.Again);
+                await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+
+                const card = c.reviewSequencer.currentCard;
+                expect(card.front).toEqual("Q1");
+                expect(card.back).toEqual("A1");
+                expect(card.question.questionText.cardCommentRef).toMatch(/^sr-[0-9a-f]{6}$/);
+                expect(card.question.questionText.actualQuestion).not.toContain("[^sr-");
+            });
+        });
+    }
+});
+
 describe("updateCurrentQuestionTextAndCards", () => {
     const space: string = " ";
 
