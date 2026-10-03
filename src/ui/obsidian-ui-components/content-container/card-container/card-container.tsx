@@ -108,7 +108,12 @@ export class CardContainer {
         this.content = this.scrollWrapper.createDiv();
         this.content.addClass("sr-content");
 
-        this.cardComment = new CardCommentComponent(this.scrollWrapper, app, plugin);
+        // Attached to the view, not the scroll wrapper. The wrapper is a `display: flex` with no
+        // direction, so it lays its children out in a ROW, which left the box squeezed into a
+        // narrow column beside the card content. The view is a column flex, which puts the box
+        // under the answer and above the rating buttons. It is still outside this.content, so
+        // drawCardFrontContent's content.empty() cannot destroy it.
+        this.cardComment = new CardCommentComponent(this.view, app, plugin);
 
         this.response = new ResponseSectionComponent(
             this.view,
