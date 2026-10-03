@@ -130,8 +130,10 @@ export default class ContentManager {
         );
     }
 
-    public close() {
+    public async close(): Promise<void> {
         this._clearPendingResumeTimeout();
+        this._stageCardComment();
+        await this.reviewSequencer?.flushPendingCardComment();
         this.uiManager.setSRViewInFocus(false);
         this.deckContainer.closeList();
         this.cardContainer.closeSession();
@@ -183,6 +185,8 @@ export default class ContentManager {
 
     private async _showDecksList(reloadReviewQueue: boolean = false): Promise<void> {
         this._clearPendingResumeTimeout();
+        this._stageCardComment();
+        await this.reviewSequencer?.flushPendingCardComment();
         if (reloadReviewQueue) {
             this.reviewSequencer = await this.reviewQueueLoader.loadReviewQueue();
         }
@@ -342,6 +346,10 @@ export default class ContentManager {
             t("CANCEL"),
             async () => {
                 if (this.sessionData === null || this.reviewSequencer === null) return;
+                // Discard any typed comment: NotesDataStore.delete leaves the [^sr-...]
+                // definition behind, so flushing here would write a definition that is
+                // orphaned a moment later. Just clear the box.
+                this.cardContainer.takeCardCommentText();
                 await this.reviewSequencer.deleteCurrentCardFromNote();
                 await this._showNextCard();
             },
@@ -391,6 +399,11 @@ export default class ContentManager {
         await editModal
             .then(async (modifiedCardText) => {
                 if (this.reviewSequencer === null) return;
+                // Flush before the edit, per Task 6 correction: staged text must land on disk
+                // first, or it survives only in memory and is lost at the next exit, and
+                // flushing first also keeps questionText.original matching what is on disk.
+                this._stageCardComment();
+                await this.reviewSequencer.flushPendingCardComment();
                 await this.reviewSequencer.updateCurrentQuestionTextAndCards(modifiedCardText);
                 this.uiManager.setUIState(currentUIState);
 
@@ -464,6 +477,8 @@ export default class ContentManager {
 
     public async _skipCurrentCard() {
         if (this.reviewSequencer === null) return;
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
         this.reviewSequencer.skipCurrentCard();
         await this._showNextCard();
     }
@@ -487,6 +502,7 @@ export default class ContentManager {
         }
         this.lastPressedOnProcessReview = timeNow;
 
+        this._stageCardComment();
         await this.reviewSequencer.processReview(response);
         await this._showNextCard();
     }
@@ -512,6 +528,12 @@ export default class ContentManager {
     }
 
     // MARK: Utils
+
+    /** Stages any typed comment. Call before leaving a card by any route. */
+    private _stageCardComment(): void {
+        if (this.reviewSequencer === null) return;
+        this.reviewSequencer.setPendingCardComment(this.cardContainer.takeCardCommentText());
+    }
 
     private _determineButtonSchedule(reviewResponse: ReviewResponse): RepItemScheduleInfo | null {
         if (this.sessionData === null) return null;

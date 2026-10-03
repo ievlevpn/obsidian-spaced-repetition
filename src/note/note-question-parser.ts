@@ -14,6 +14,7 @@ import { frontmatterTagPseudoLineNum } from "src/data/data-structures/file/sr-fi
 import { SettingsUtil, SRSettings } from "src/data/settings";
 import { parse, ParsedQuestionInfo, ParserOptions } from "src/parser";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
+import { collectCardCommentDefinitions } from "src/utils/note-footnotes";
 import {
     splitNoteIntoFrontmatterAndContent,
     splitTextIntoLineArray,
@@ -115,8 +116,13 @@ export class NoteQuestionParser {
 
         const result: Question[] = [];
         const parsedQuestionInfoList: ParsedQuestionInfo[] = this.parseQuestions();
+        const commentDefinitions: Map<string, string> = collectCardCommentDefinitions(noteText);
         for (const parsedQuestionInfo of parsedQuestionInfoList) {
             const question: Question = this.createQuestionObject(parsedQuestionInfo, textDirection);
+
+            // Attach this card's comment definition (if any), as read from the note
+            const ref: string | null = question.questionText.cardCommentRef;
+            question.cardCommentDefinition = ref ? (commentDefinitions.get(ref) ?? null) : null;
 
             // Each rawCardText can turn into multiple CardFrontBack's (e.g. CardType.Cloze, CardType.SingleLineReversed)
             const cardFrontBackList: CardFrontBack[] = CardFrontBackUtil.expand(

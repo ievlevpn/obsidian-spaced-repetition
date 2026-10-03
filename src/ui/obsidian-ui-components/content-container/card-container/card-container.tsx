@@ -9,6 +9,7 @@ import type SRPlugin from "src/main";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
+import CardCommentComponent from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment";
 import ContextSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/context-section/context-section";
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
@@ -34,6 +35,7 @@ export class CardContainer {
 
     private scrollWrapper: HTMLDivElement;
     private content: HTMLDivElement;
+    private cardComment: CardCommentComponent;
     private pendingClock: HTMLDivElement | null = null;
     private pendingResumeTimeout: number | null = null;
 
@@ -106,6 +108,13 @@ export class CardContainer {
         this.content = this.scrollWrapper.createDiv();
         this.content.addClass("sr-content");
 
+        // Attached to the view, not the scroll wrapper. The wrapper is a `display: flex` with no
+        // direction, so it lays its children out in a ROW, which left the box squeezed into a
+        // narrow column beside the card content. The view is a column flex, which puts the box
+        // under the answer and above the rating buttons. It is still outside this.content, so
+        // drawCardFrontContent's content.empty() cannot destroy it.
+        this.cardComment = new CardCommentComponent(this.view, app, plugin);
+
         this.response = new ResponseSectionComponent(
             this.view,
             settings,
@@ -171,6 +180,7 @@ export class CardContainer {
 
         // Update card content
         await this.drawCardFrontContent(sessionData, settings);
+        this.cardComment.hide();
 
         // Update response buttons
         this.response.resetResponseButtons();
@@ -227,6 +237,7 @@ export class CardContainer {
         this.toolbar.setResetButtonDisabled(true);
         this.cardState = CardState.Front;
         this.content.empty();
+        this.cardComment.hide();
         this.response.hideAllButtons();
         this.pendingClock = this.content.createDiv({
             cls: "sr-centered",
@@ -254,6 +265,11 @@ export class CardContainer {
         };
 
         updatePendingClock();
+    }
+
+    /** Returns text typed into the comment box and clears it. */
+    public takeCardCommentText(): string {
+        return this.cardComment.takeText();
     }
 
     // #region -> Deck Info
@@ -372,6 +388,28 @@ export class CardContainer {
 
         // Evaluate cloze answers
         this._evaluateClozeAnswers();
+
+        // The comment box is suppressed for any card that contains a ">" line anywhere.
+        //
+        // This is DELIBERATELY wider than "the card is hosted inside a blockquote": it also
+        // catches a card whose answer merely quotes something, or contains a "> [!note]"
+        // callout. Measured on a 4263-card vault, that is 17 cards (0.4%), silently. The wide
+        // test is the ruling, not an oversight: an earlier attempt checked only the first
+        // line and missed the common case of a card whose quote starts further down, which is
+        // the shape that actually occurs. A reference emitted inside a quoted region renders,
+        // but the definition it points at necessarily lands at the end of the note, outside
+        // the quote, so the pair reads as part of a quote the user did not write. Refusing the
+        // box is the conservative choice. Recorded in the design doc's limitations.
+        const cardText: string = sessionData.currentQuestion.questionText.original;
+        const hostedInBlockquote: boolean = cardText
+            .split("\n")
+            .some((line) => line.trimStart().startsWith(">"));
+        if (reviewMode !== FlashcardReviewMode.Cram && !hostedInBlockquote) {
+            await this.cardComment.show(
+                sessionData.currentQuestion.cardCommentDefinition,
+                sessionData.currentNote.filePath,
+            );
+        }
 
         // Show response buttons
         this.response.showRatingButtons(

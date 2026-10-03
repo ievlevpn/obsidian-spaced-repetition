@@ -18,6 +18,7 @@ const en: IBaseLocale = {
     TOTAL: "Total",
     BACK: "Back",
     SKIP: "Skip",
+    CARD_NOTE_PLACEHOLDER: "Note to self…",
     EDIT_CARD: "Edit Card",
     RESET_CARD_PROGRESS: "Reset card's progress",
     HARD: "Hard",

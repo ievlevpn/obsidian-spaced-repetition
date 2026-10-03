@@ -745,6 +745,48 @@ function checkFindResult(text: string, searchStr: string, expectedResult: number
     expect(result).toEqual(expectedResult);
 }
 
+describe("MultiLineTextFinder.countMatches", () => {
+    function count(text: string, searchStr: string): number {
+        return MultiLineTextFinder.countMatches(
+            splitTextIntoLineArray(text),
+            splitTextIntoLineArray(searchStr),
+        );
+    }
+
+    test("No match", () => {
+        expect(count("a\nb\nc", "d")).toEqual(0);
+    });
+
+    test("Empty search text", () => {
+        expect(count("a\nb", "")).toEqual(0); // no blank line in the source to match
+        expect(count("a\n\nb", "")).toEqual(1);
+        expect(MultiLineTextFinder.countMatches(["a"], [])).toEqual(0);
+    });
+
+    test("Single line, one match and several", () => {
+        expect(count("a\nb\nc", "b")).toEqual(1);
+        expect(count("b\na\nb\nb", "b")).toEqual(3);
+    });
+
+    test("Multi line matches are counted whole and non-overlapping", () => {
+        expect(count("x\na\nb\ny\na\nb\nz", "a\nb")).toEqual(2);
+        expect(count("a\na\na", "a\na")).toEqual(1);
+    });
+
+    test("Comparison is per-line and trimmed, as in find()", () => {
+        expect(count("  b  \nb", "b")).toEqual(2);
+        // A line is matched whole: a card line is not found inside a longer line
+        expect(count("Q1::A1 <!--SR:!2021-08-11,4,270-->", "Q1::A1")).toEqual(0);
+    });
+
+    test("find() returning a position implies at least one match", () => {
+        const text = splitTextIntoLineArray("x\na\nb\ny");
+        const search = splitTextIntoLineArray("a\nb");
+        expect(MultiLineTextFinder.find(text, search)).toEqual(1);
+        expect(MultiLineTextFinder.countMatches(text, search)).toEqual(1);
+    });
+});
+
 describe("includedSperator", () => {
     const sep = ["::", ":::", "?", "??"];
 

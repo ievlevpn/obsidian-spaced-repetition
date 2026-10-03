@@ -1,0 +1,47 @@
+.sr-card-comment {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-2-2);
+    padding: 0 var(--size-4-3) var(--size-4-2) var(--size-4-3);
+    /* A column-flex sibling of the scrolling content: never let it be compressed away when
+       vertical space is tight, which is the common case on a phone. */
+    flex-shrink: 0;
+    width: 100%;
+}
+
+.sr-card-comment.sr-is-hidden {
+    display: none;
+}
+
+.sr-card-comment-past {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-2-1);
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+    border-left: 2px solid var(--background-modifier-border);
+    padding-left: var(--size-4-2);
+}
+
+.sr-card-comment-entry {
+    display: flex;
+    gap: var(--size-4-1);
+}
+
+.sr-card-comment-date {
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-faint);
+}
+
+.sr-card-comment-text > p {
+    margin: 0;
+}
+
+.sr-card-comment-input {
+    width: 100%;
+    resize: none;
+    overflow-y: auto;
+    min-height: var(--input-height);
+    font-size: var(--font-ui-small);
+}

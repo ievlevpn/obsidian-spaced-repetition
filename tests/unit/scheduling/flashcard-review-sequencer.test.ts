@@ -95,6 +95,13 @@ class TestContext {
         return deckTree;
     }
 
+    // Re-parses the given text into the sequencer, e.g. to pick up changes written by a
+    // previous processReview()/flushPendingCardComment() call within the same test.
+    async setSequencerDeckTreeFromOriginalTextWith(text: string): Promise<Deck> {
+        this.file.content = text;
+        return this.setSequencerDeckTreeFromOriginalText();
+    }
+
     getDeckStats(topicTag: string): DeckStats {
         return this.reviewSequencer.getDeckStats(TopicPath.getTopicPathFromTag(topicTag));
     }
@@ -913,6 +920,471 @@ ${indent}- bar?::baz
             });
         });
     });
+});
+
+describe("card comments", () => {
+    const settings: SRSettings = { ...DEFAULT_SETTINGS };
+    settings.cardCommentOnSameLine = true;
+
+    async function contextWith(text: string): Promise<TestContext> {
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            settings,
+            text,
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        return c;
+    }
+
+    test("a staged comment creates a reference and a definition in one write", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("a thought");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toMatch(/#flashcards Q1::A1 \[\^sr-[0-9a-f]{6}\] <!--SR:![^\n]+-->/);
+        expect(fileText).toMatch(/\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* a thought/);
+    });
+
+    test("blank staged text writes no reference and no definition", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("   \n  ");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).not.toContain("[^sr-");
+    });
+
+    test("a second comment extends the same definition and reuses the label", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* earlier",
+        );
+
+        c.reviewSequencer.setPendingCardComment("later");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("[^sr-a3f91c]: - *2026-01-01:* earlier");
+        expect(fileText).toContain("    - *2023-09-06:* later");
+        expect(fileText.match(/\[\^sr-a3f91c\]:/g)).toHaveLength(1);
+        expect(fileText.match(/\[\^sr-/g)).toHaveLength(2); // one reference, one definition
+    });
+
+    test("a staged comment cannot leak onto the next card", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q2::A2 <!--SR:!2023-09-02,4,270-->",
+        );
+
+        c.reviewSequencer.setPendingCardComment("only for the first card");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText.match(/\[\^sr-[0-9a-f]{6}\]:/g)).toHaveLength(1);
+    });
+
+    test("flushPendingCardComment writes without rating the card", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("jotted, then skipped");
+        await c.reviewSequencer.flushPendingCardComment();
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("- *2023-09-06:* jotted, then skipped");
+        expect(fileText).toContain("<!--SR:!2023-09-02,4,270-->"); // schedule untouched
+    });
+
+    test("repeated commented reviews converge: prose around the card is untouched", async () => {
+        const original = [
+            "# Heading",
+            "",
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+            "",
+            "prose below the card",
+            "",
+            "[^1]: the user's own footnote",
+            "",
+        ].join("\n");
+        const c: TestContext = await contextWith(original);
+
+        // ReviewResponse.Again (not Good): with the card's starting schedule
+        // (interval 4, overdue from 2023-09-02), a Good response pushes the new due date to
+        // 2023-09-17 - no longer due "today" (2023-09-06) once the note is re-parsed, so the
+        // loop's second iteration would find no current card. Again sets interval to 0, whose
+        // due date is always "today", so the same card stays due across all three iterations -
+        // confirmed by hand with a standalone repro before adjusting this from the brief's
+        // original ReviewResponse.Good.
+        for (const text of ["one", "two", "three"]) {
+            c.reviewSequencer.setPendingCardComment(text);
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+            await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+        }
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("# Heading");
+        expect(fileText).toContain("prose below the card");
+        expect(fileText).toContain("[^1]: the user's own footnote");
+        // exactly one definition, holding all three entries
+        expect(fileText.match(/\[\^sr-[0-9a-f]{6}\]:/g)).toHaveLength(1);
+        expect(fileText).toContain("*2023-09-06:* one");
+        expect(fileText).toContain("*2023-09-06:* two");
+        expect(fileText).toContain("*2023-09-06:* three");
+    });
+
+    test("cram mode writes nothing", async () => {
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Cram,
+            settings,
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        const before: string = await c.file.read();
+
+        c.reviewSequencer.setPendingCardComment("should not be written");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        expect(await c.file.read()).toBe(before);
+    });
+
+    test("a rated card with a comment performs exactly one file write", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+        const writeSpy = jest.spyOn(c.file, "write");
+
+        c.reviewSequencer.setPendingCardComment("a thought");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(writeSpy).toHaveBeenCalledTimes(1);
+        writeSpy.mockRestore();
+    });
+
+    test("writes nothing when the card's text can no longer be found in the note", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        // Simulate the note being changed externally mid-review
+        c.file.content = "totally different note\n";
+        const writeSpy = jest.spyOn(c.file, "write");
+
+        c.reviewSequencer.setPendingCardComment("orphan risk");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(writeSpy).not.toHaveBeenCalled();
+        expect(await c.file.read()).toBe("totally different note\n");
+    });
+
+    // I2: resolveCardComment allocates the label BEFORE updateQuestionWithinNoteText can
+    // report a miss. If the label is not rolled back, the next successful write - a
+    // short-term requeue, or Edit Card, which writes unconditionally - emits "[^sr-xxxxxx]"
+    // into the user's prose with no definition anywhere.
+    test("a write miss leaves no label behind for the next write to orphan", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+        const question = c.reviewSequencer.currentQuestion;
+        expect(question.questionText.cardCommentRef).toBeNull();
+
+        // The note changes under us mid-review, so the card's text can no longer be found
+        c.file.content = "totally different note\n";
+        c.reviewSequencer.setPendingCardComment("orphan risk");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(question.questionText.cardCommentRef).toBeNull();
+
+        // The note comes back and the same question object is written again, with no comment
+        c.file.content = "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n";
+        await question.writeQuestion(c.settings);
+
+        expect(await c.file.read()).not.toContain("[^sr-");
+    });
+
+    test("a write miss does not strand a label already written to the note", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* earlier",
+        );
+        const question = c.reviewSequencer.currentQuestion;
+        expect(question.questionText.cardCommentRef).toEqual("sr-a3f91c");
+
+        c.file.content = "totally different note\n";
+        c.reviewSequencer.setPendingCardComment("lost to the miss");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        // The pre-existing label is kept: it has a definition, so it is not an orphan
+        expect(question.questionText.cardCommentRef).toEqual("sr-a3f91c");
+    });
+
+    // Spec testing item 10. The spec claimed first-match-wins was "not made worse" by this
+    // feature; it was, because a mis-attributed comment plants a visible marker and a dated
+    // entry on the wrong card permanently. The write path now refuses the comment instead.
+    describe("two identical cards in one note", () => {
+        const twoIdentical: string =
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->";
+
+        test("a comment is refused rather than attributed to the wrong copy", async () => {
+            const c: TestContext = await contextWith(twoIdentical);
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            c.reviewSequencer.setPendingCardComment("which card is this?");
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            // No reference, no definition: nothing was planted on the wrong card.
+            expect(fileText).not.toContain("[^sr-");
+            expect(warnSpy).toHaveBeenCalled();
+            warnSpy.mockRestore();
+        });
+
+        test("identical UNSCHEDULED cards never accumulate anything, however many comments", async () => {
+            // The scheduled pair above stops being ambiguous as soon as the first review
+            // gives one of them a different schedule comment. Unscheduled cards stay
+            // byte-identical for as long as the user only ever comments on them, so this is
+            // the shape where a mis-attribution would compound.
+            const c: TestContext = await contextWith("#flashcards Q1::A1\n\n#flashcards Q1::A1");
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            for (const text of ["one", "two", "three"]) {
+                c.reviewSequencer.setPendingCardComment(text);
+                await c.reviewSequencer.flushPendingCardComment();
+                await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+            }
+
+            expect(await c.file.read()).toEqual("#flashcards Q1::A1\n\n#flashcards Q1::A1");
+            warnSpy.mockRestore();
+        });
+
+        test("the schedules still persist, exactly as they did before the comment feature", async () => {
+            const c: TestContext = await contextWith(twoIdentical);
+            const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toContain("<!--SR:!2023-09-06,0,");
+            warnSpy.mockRestore();
+        });
+
+        test("once the cards differ, commenting works again", async () => {
+            const c: TestContext = await contextWith(
+                "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q2::A2 <!--SR:!2023-09-02,4,270-->",
+            );
+
+            c.reviewSequencer.setPendingCardComment("fine on a unique card");
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toMatch(/\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* fine on a unique card/);
+        });
+    });
+
+    test("blank staged text emits no reference on the card", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("    ");
+        await c.reviewSequencer.processReview(ReviewResponse.Again);
+
+        expect(await c.file.read()).not.toContain("[^sr-");
+    });
+});
+
+// Spec testing item 4: "three successive rated reviews leave the note byte-identical apart
+// from the schedule and the new entries. This is the test the archived design failed."
+//
+// The assertion is byte equality of the note's *skeleton* - everything the comment feature is
+// not allowed to touch - against the skeleton of the original note, after three
+// write/re-parse cycles, for every card shape, under BOTH cardCommentOnSameLine values.
+// Four `toContain` fragments on one card shape under one setting is what let the unbounded
+// accumulation bug through six task reviews; this is the check that catches it.
+describe("card comment convergence", () => {
+    const SR_DEFINITION_LINE = /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/;
+    const REF_TOKEN_GLOBAL = /\[\^sr-[0-9a-f]{6}\]/g;
+
+    /**
+     * Reduces a note to the bytes a comment write must leave alone:
+     *   - the trailing `[^sr-...]` definition block (and the blank lines introducing it) is cut,
+     *   - every footnote reference token is removed along with the one space or newline that
+     *     separates it from its neighbour (the token+trailing-space rule first, so a token
+     *     sitting on its own line in front of a schedule comment gives the line back rather
+     *     than swallowing the newline),
+     *   - schedule comments are masked, since their dates legitimately change every review.
+     * Trailing newlines are normalised because the first append collapses them (known Minor,
+     * cosmetic and one-time per note); everything else must match byte for byte.
+     */
+    function skeleton(text: string): string {
+        const lines: string[] = text.replaceAll("\r\n", "\n").split("\n");
+        let cut: number = lines.findIndex((line) => SR_DEFINITION_LINE.test(line));
+        if (cut >= 0) {
+            while (cut > 0 && lines[cut - 1].trim().length === 0) cut--;
+            lines.length = cut;
+        }
+        return lines
+            .join("\n")
+            .replace(/\[\^sr-[0-9a-f]{6}\] /g, "")
+            .replace(/[ \n]\[\^sr-[0-9a-f]{6}\]/g, "")
+            .replace(/<!--SR:[^>]*-->/g, "<!--SR-->")
+            .replace(/\n+$/, "");
+    }
+
+    /** The lines of the note's sr- definition block, or [] if there is none. */
+    function definitionBlock(text: string): string[] {
+        const lines: string[] = text.replaceAll("\r\n", "\n").split("\n");
+        const start: number = lines.findIndex((line) => SR_DEFINITION_LINE.test(line));
+        if (start < 0) return [];
+        return lines.slice(start).filter((line) => line.trim().length > 0);
+    }
+
+    function countMatches(text: string, re: RegExp): number {
+        return (text.match(re) ?? []).length;
+    }
+
+    const userFootnotes: string[] = [
+        "",
+        "prose after the card",
+        "",
+        "[^1]: the user's own numbered footnote",
+        "    with an indented continuation line",
+        "[^note]: a named footnote of the user's",
+        "",
+    ];
+
+    interface Shape {
+        name: string;
+        /** Card text with no schedule comment yet. */
+        card: string[];
+    }
+
+    const shapes: Shape[] = [
+        { name: "an inline card", card: ["#flashcards Q1::A1"] },
+        {
+            name: "a multi-line card",
+            card: ["#flashcards", "What is the front?", "?", "This is the back", "and more back"],
+        },
+        { name: "a cloze card", card: ["#flashcards " + clozeQuestion1] },
+        {
+            name: "a card ending in a code fence",
+            card: [
+                "#flashcards",
+                "How do you print in python?",
+                "?",
+                "```python",
+                "print(1)",
+                "```",
+            ],
+        },
+        {
+            name: "a card with an Obsidian block id",
+            card: ["#flashcards Q1::A1 ^block-id-1"],
+        },
+    ];
+
+    function noteFor(cardLines: string[]): string {
+        return ["# Heading", "", ...cardLines, ...userFootnotes].join("\n");
+    }
+
+    function contextFor(text: string, onSameLine: boolean): TestContext {
+        const settings: SRSettings = { ...DEFAULT_SETTINGS };
+        settings.cardCommentOnSameLine = onSameLine;
+        return TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            settings,
+            text,
+            moment().millisecond().toString() + Math.random().toString(),
+        );
+    }
+
+    for (const onSameLine of [true, false]) {
+        describe(`cardCommentOnSameLine: ${onSameLine}`, () => {
+            for (const shape of shapes) {
+                // ReviewResponse.Again, not Good: Good pushes the due date past the static
+                // test date (2023-09-06), the card leaves the queue, and currentCard is null
+                // on the second iteration. Again always re-dues the card today.
+                test(`${shape.name}, three rated reviews with a comment each`, async () => {
+                    const c: TestContext = contextFor(noteFor(shape.card), onSameLine);
+                    await c.setSequencerDeckTreeFromOriginalText();
+
+                    // Baseline: one rated review with NO comment. This lets the plugin itself
+                    // decide where the schedule comment goes for this shape, so the test
+                    // measures only what the COMMENT feature adds and never hard-codes a
+                    // schedule layout that might not be the plugin's own.
+                    await c.reviewSequencer.processReview(ReviewResponse.Again);
+                    const original: string = await c.file.read();
+                    await c.setSequencerDeckTreeFromOriginalTextWith(original);
+                    expect(original).not.toContain("[^sr-");
+
+                    const texts: string[] = ["first thought", "second thought", "third thought"];
+                    for (const text of texts) {
+                        expect(c.reviewSequencer.hasCurrentCard).toEqual(true);
+                        c.reviewSequencer.setPendingCardComment(text);
+                        await c.reviewSequencer.processReview(ReviewResponse.Again);
+                        await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+                    }
+
+                    const final: string = await c.file.read();
+
+                    // Nothing outside the schedule comment and the definition block moved.
+                    expect(skeleton(final)).toEqual(skeleton(original));
+                    // Exactly one reference on the card, exactly one definition.
+                    expect(countMatches(final, REF_TOKEN_GLOBAL)).toEqual(2);
+                    expect(countMatches(final, /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/gm)).toEqual(1);
+                    // All three entries, in order, in that one definition.
+                    const block: string[] = definitionBlock(final);
+                    expect(block).toHaveLength(3);
+                    texts.forEach((text, idx) =>
+                        expect(block[idx]).toContain(`*2023-09-06:* ${text}`),
+                    );
+                });
+
+                // The unscheduled card is the branch with no schedule comment for the
+                // reference to sit in front of, so the reference has to stand on its own.
+                // flushPendingCardComment is the real path that reaches it: the user types a
+                // comment and then skips the card, or closes the view, without rating it.
+                test(`${shape.name} with no schedule, three comment flushes`, async () => {
+                    const original: string = noteFor(shape.card);
+                    const c: TestContext = contextFor(original, onSameLine);
+                    await c.setSequencerDeckTreeFromOriginalText();
+
+                    const texts: string[] = ["alpha", "beta", "gamma"];
+                    for (const text of texts) {
+                        expect(c.reviewSequencer.hasCurrentCard).toEqual(true);
+                        c.reviewSequencer.setPendingCardComment(text);
+                        await c.reviewSequencer.flushPendingCardComment();
+                        await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+                    }
+
+                    const final: string = await c.file.read();
+
+                    expect(skeleton(final)).toEqual(skeleton(original));
+                    expect(countMatches(final, REF_TOKEN_GLOBAL)).toEqual(2);
+                    expect(countMatches(final, /^ {0,3}\[\^sr-[0-9a-f]{6}\]:/gm)).toEqual(1);
+                    const block: string[] = definitionBlock(final);
+                    expect(block).toHaveLength(3);
+                    texts.forEach((text, idx) =>
+                        expect(block[idx]).toContain(`*2023-09-06:* ${text}`),
+                    );
+                });
+            }
+
+            // Spec testing item 2: a full parse -> write -> re-parse round trip, which was
+            // only covered at the QuestionText/formatForNote level under this setting.
+            test("round trip: the re-parsed card drops the reference from its own text", async () => {
+                const original: string = noteFor([
+                    "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+                ]);
+                const c: TestContext = contextFor(original, onSameLine);
+                await c.setSequencerDeckTreeFromOriginalText();
+
+                c.reviewSequencer.setPendingCardComment("a thought");
+                await c.reviewSequencer.processReview(ReviewResponse.Again);
+                await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+
+                const card = c.reviewSequencer.currentCard;
+                expect(card.front).toEqual("Q1");
+                expect(card.back).toEqual("A1");
+                expect(card.question.questionText.cardCommentRef).toMatch(/^sr-[0-9a-f]{6}$/);
+                expect(card.question.questionText.actualQuestion).not.toContain("[^sr-");
+            });
+        });
+    }
 });
 
 describe("updateCurrentQuestionTextAndCards", () => {

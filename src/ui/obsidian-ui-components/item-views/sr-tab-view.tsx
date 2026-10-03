@@ -161,7 +161,6 @@ export class SRTabView extends ItemView {
      * Ensures that resources associated with these views are properly released.
      */
 
-    // eslint-disable-next-line @typescript-eslint/require-await
     async onClose() {
         // Resets the changes made in onOpen
         if (activeDocument.body.classList.contains("is-mobile")) {
@@ -182,7 +181,7 @@ export class SRTabView extends ItemView {
             );
         }
 
-        if (this.contentManager) this.contentManager.close();
+        if (this.contentManager) await this.contentManager.close();
     }
 
     private setSize(widthPercent: number, heightPercent: number) {

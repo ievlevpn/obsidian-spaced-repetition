@@ -3,6 +3,7 @@ import { ClozeCrafter } from "clozecraft";
 import { SR_METADATA_CALLOUT } from "src/data/constants";
 import { containsMathCloze } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
+import { isFootnoteContinuationLine, isFootnoteDefinitionLine } from "src/utils/card-comment";
 
 export let debugParser = false;
 
@@ -112,6 +113,36 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             continue;
         }
 
+        // Skip footnote definitions wholesale, including indented continuations. Their text
+        // is prose the plugin must not interpret: a definition containing ":::" would
+        // otherwise be picked up as a card, and one sitting directly under a multi line card
+        // would be absorbed into it. This also protects the user's own footnotes.
+        //
+        // A definition line TERMINATES any card accumulating above it, exactly as a blank
+        // line does; it must not merely be dropped while accumulation continues past it.
+        // Dropping it would leave questionText.original non-contiguous in the note, so
+        // MultiLineTextFinder would miss forever, every write would be suppressed, and the
+        // card's schedule would silently never persist. Terminating here also keeps
+        // lastLineNum honest: it used to be inflated by one plus the definition's
+        // continuation count, growing without bound with the definition's length.
+        //
+        // NOTE for hand-editors: isFootnoteContinuationLine treats ANY indented non-blank
+        // line as a continuation, so content glued directly under a definition is consumed
+        // into it. Leave a blank line before anything you add under an `sr-` footnote. See
+        // the comment on formatCardCommentDefinition in src/utils/card-comment.ts.
+        if (isFootnoteDefinitionLine(currentLine)) {
+            if (cardType) {
+                cards.push(
+                    new ParsedQuestionInfo(cardType, cardText.trimEnd(), firstLineNo, i - 1),
+                );
+                cardType = null;
+            }
+            cardText = "";
+            while (i + 1 < lines.length && isFootnoteContinuationLine(lines[i + 1])) i++;
+            firstLineNo = i + 1;
+            continue;
+        }
+
         // Have we reached the end of a card?
         const isEmptyLine = currentTrimmed.length === 0;
         const hasMultilineCardEndMarker =
@@ -157,8 +188,20 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             cardText = currentLine;
             firstLineNo = i;
 
-            // Pick up scheduling information if present
-            if (i + 1 < lines.length && lines[i + 1].startsWith("<!--SR:")) {
+            // Pick up scheduling information if present. The line may begin with this
+            // plugin's footnote reference, which travels immediately before the schedule.
+            const nextLine: string = i + 1 < lines.length ? lines[i + 1] : "";
+            // The `$` alternative is load bearing, not defensive. A card with no schedule yet
+            // has no comment for the reference to sit in front of, so formatForNote emits a
+            // BARE "\n[^sr-xxxxxx]" line (own-line placement: cardCommentOnSameLine false, or
+            // a card ending in a code fence). If that line is not absorbed here, the card
+            // re-parses WITHOUT its reference, mints a fresh label, and appends another
+            // reference line and another definition on every single comment, without bound -
+            // which is exactly the death mode that got the earlier callout design abandoned.
+            const nextIsScheduleOrCommentRef: boolean =
+                nextLine.startsWith("<!--SR:") ||
+                /^\[\^sr-[0-9a-f]{6}\]( <!--SR:|$)/.test(nextLine);
+            if (nextIsScheduleOrCommentRef) {
                 cardText += "\n" + lines[i + 1];
                 i++;
             } else if (i + 1 < lines.length && lines[i + 1].startsWith(SR_METADATA_CALLOUT)) {

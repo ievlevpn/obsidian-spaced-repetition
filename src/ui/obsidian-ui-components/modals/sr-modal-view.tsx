@@ -65,7 +65,9 @@ export class SRModalView extends Modal {
     }
 
     onClose(): void {
-        this.contentManager.close();
+        // Modal's onClose is synchronous and cannot be awaited, so the comment flush here is
+        // best-effort: it starts, but nothing waits for it to land before the modal tears down.
+        void this.contentManager.close();
     }
 
     private async onResize(entries: ResizeObserverEntry[]) {

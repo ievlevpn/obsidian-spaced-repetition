@@ -14,7 +14,20 @@ import {
 import { SRSettings } from "src/data/settings";
 import { Note } from "src/note/note";
 import { ParsedQuestionInfo } from "src/parser";
-import { cyrb53, MultiLineTextFinder, stringTrimStart, TextDirection } from "src/utils/strings";
+import {
+    appendCardCommentEntry,
+    extractCardCommentRef,
+    formatCardCommentRef,
+    generateCardCommentLabel,
+} from "src/utils/card-comment";
+import { collectCardCommentLabels, findFootnoteDefinition } from "src/utils/note-footnotes";
+import {
+    cyrb53,
+    MultiLineTextFinder,
+    splitTextIntoLineArray,
+    stringTrimStart,
+    TextDirection,
+} from "src/utils/strings";
 
 export enum CardType {
     SingleLineBasic,
@@ -98,8 +111,13 @@ export class QuestionText {
     // If present, then first character is "^"
     obsidianBlockId: string;
 
+    // Label of the footnote holding the user's dated notes about this card, e.g. "sr-a3f91c",
+    // or null when the card has no comment. Deliberately excluded from textHash.
+    cardCommentRef: string | null;
+
     // Hash of string  (topicPath + actualQuestion)
-    // Explicitly excludes the HTML comment with the scheduling info
+    // Explicitly excludes the HTML comment with the scheduling info, the obsidian block ID,
+    // and the card comment reference
     textHash: string;
 
     constructor(
@@ -108,12 +126,14 @@ export class QuestionText {
         actualQuestion: string,
         textDirection: TextDirection,
         blockId: string,
+        cardCommentRef: string | null = null,
     ) {
         this.original = original;
         this.topicPathWithWs = topicPathWithWs;
         this.actualQuestion = actualQuestion;
         this.textDirection = textDirection;
         this.obsidianBlockId = blockId;
+        this.cardCommentRef = cardCommentRef;
 
         // The hash is generated based on the topic and question, explicitly not the schedule or obsidian block ID
         this.textHash = cyrb53(this.formatTopicAndQuestion());
@@ -128,15 +148,25 @@ export class QuestionText {
         textDirection: TextDirection,
         settings: SRSettings,
     ): QuestionText {
-        const [topicPathWithWs, actualQuestion, blockId] = this.splitText(original, settings);
+        const [topicPathWithWs, actualQuestion, blockId, cardCommentRef] = this.splitText(
+            original,
+            settings,
+        );
 
-        return new QuestionText(original, topicPathWithWs, actualQuestion, textDirection, blockId);
+        return new QuestionText(
+            original,
+            topicPathWithWs,
+            actualQuestion,
+            textDirection,
+            blockId,
+            cardCommentRef,
+        );
     }
 
     static splitText(
         original: string,
         settings: SRSettings,
-    ): [TopicPathWithWs | null, string, string] {
+    ): [TopicPathWithWs | null, string, string, string | null] {
         const originalWithoutSR = DataStore.getInstance().removeScheduleInfo(original);
         let actualQuestion: string = originalWithoutSR.trimEnd();
 
@@ -154,14 +184,37 @@ export class QuestionText {
             // actualQuestion - Question [whitespace blockId]
             let postTopicPathWs: string;
             [postTopicPathWs, actualQuestion] = stringTrimStart(cardText3);
+            // Trailing whitespace must go here too, or endsWithCodeBlock() is false for a
+            // tagged card ending in a fence and the schedule is written onto the closing
+            // fence, permanently breaking write-back for that card.
+            actualQuestion = actualQuestion.trimEnd();
             if (!settings.convertFoldersToDecks) {
                 topicPathWithWs = new TopicPathWithWs(topicPath, preTopicPathWs, postTopicPathWs);
             }
         }
 
-        // actualQuestion - Question [whitespace blockId]
-        const [strippedQuestion, blockId] = this.extractObsidianBlockId(actualQuestion);
-        return [topicPathWithWs, strippedQuestion, blockId];
+        // The line can carry both an Obsidian block id and this plugin's footnote reference,
+        // and formatForNote orders them differently in the same-line and own-line cases.
+        // Strip whichever matches at the end, repeatedly, so order never matters.
+        let blockId: string | null = null;
+        let cardCommentRef: string | null = null;
+        for (;;) {
+            const [withoutBlockId, foundBlockId] = this.extractObsidianBlockId(actualQuestion);
+            if (foundBlockId) {
+                blockId = foundBlockId;
+                actualQuestion = withoutBlockId;
+                continue;
+            }
+            const [withoutRef, foundRef] = extractCardCommentRef(actualQuestion);
+            if (foundRef) {
+                cardCommentRef = foundRef;
+                actualQuestion = withoutRef;
+                continue;
+            }
+            break;
+        }
+
+        return [topicPathWithWs, actualQuestion, blockId, cardCommentRef];
     }
 
     static extractObsidianBlockId(text: string): [string, string] {
@@ -197,6 +250,17 @@ export class Question {
     cards: Card[];
     hasChanged: boolean;
 
+    // The footnote definition holding this card's comments, as read from the note, or null
+    cardCommentDefinition: string | null = null;
+
+    // Staged comment text/date, set by stageCardComment() and consumed by resolveCardComment()
+    private pendingCardCommentText: string | null = null;
+    private pendingCardCommentDate: string | null = null;
+
+    // Whether the most recent updateQuestionWithinNoteText call located this question's
+    // original text. False means the note changed under us and nothing should be written.
+    lastUpdateFoundOriginal: boolean = true;
+
     get questionType(): CardType {
         return this.parsedQuestionInfo.cardType;
     }
@@ -214,6 +278,17 @@ export class Question {
         return sep;
     }
 
+    /**
+     * Appends the comment reference where the schedule comment would have gone. Used on the
+     * paths that have no schedule comment to sit in front of, so the reference still inherits
+     * the plugin's own same-line/own-line placement decision.
+     */
+    private appendCardCommentRef(result: string, ref: string, settings: SRSettings): string {
+        if (!ref) return result;
+        const trimmed: string = result.trimEnd();
+        return trimmed + (this.isCardCommentsOnSameLine(settings) ? ` ${ref}` : `\n${ref}`);
+    }
+
     isCardCommentsOnSameLine(settings: SRSettings): boolean {
         let result: boolean = settings.cardCommentOnSameLine;
         // Schedule info must be on next line if last block is a codeblock
@@ -228,9 +303,73 @@ export class Question {
         this.cards.forEach((card) => (card.question = this));
     }
 
+    /** Records the footnote label for this card's comment. */
+    setCardCommentRef(label: string): void {
+        if (this.questionText.cardCommentRef === label) return;
+        this.questionText.cardCommentRef = label;
+        this.hasChanged = true;
+    }
+
+    /** Records comment text to be written by the next write of this question. */
+    stageCardComment(text: string, date: string): void {
+        this.pendingCardCommentText = text;
+        this.pendingCardCommentDate = date;
+        this.hasChanged = true;
+    }
+
+    /** Throws away any staged comment without writing it. */
+    discardPendingCardComment(): void {
+        this.pendingCardCommentText = null;
+        this.pendingCardCommentDate = null;
+    }
+
+    /**
+     * True when this question's text occurs in more than one place in the note, so the write
+     * target cannot be identified: MultiLineTextFinder takes the first match, which for two
+     * byte-identical cards is not necessarily this one.
+     */
+    isTextAmbiguousWithinNote(noteText: string): boolean {
+        return (
+            MultiLineTextFinder.countMatches(
+                splitTextIntoLineArray(noteText),
+                splitTextIntoLineArray(this.questionText.original),
+            ) > 1
+        );
+    }
+
+    /**
+     * Resolves any staged comment against the note's current text: allocates a footnote
+     * label if this card has none, and returns the definition to write. Returns null when
+     * nothing is staged. Called by the data store, which has already read the note.
+     */
+    resolveCardComment(noteText: string): string | null {
+        const text: string | null = this.pendingCardCommentText;
+        const date: string | null = this.pendingCardCommentDate;
+        this.pendingCardCommentText = null;
+        this.pendingCardCommentDate = null;
+        if (!text || text.trim().length === 0 || !date) return null;
+
+        let label: string | null = this.questionText.cardCommentRef;
+        if (!label) {
+            label = generateCardCommentLabel(collectCardCommentLabels(noteText));
+            this.setCardCommentRef(label);
+        }
+
+        const definition: string | null = appendCardCommentEntry(
+            this.cardCommentDefinition ?? findFootnoteDefinition(noteText, label),
+            label,
+            text,
+            date,
+        );
+        return definition;
+    }
+
     formatForNote(settings: SRSettings): string {
         let result: string = this.questionText.formatTopicAndQuestion();
         const blockId: string = this.questionText.obsidianBlockId;
+        const ref: string = this.questionText.cardCommentRef
+            ? formatCardCommentRef(this.questionText.cardCommentRef)
+            : "";
         const hasSchedule: boolean = this.cards.some((card) => card.hasSchedule);
         if (hasSchedule) {
             result = result.trimEnd();
@@ -247,30 +386,38 @@ export class Question {
                     result += `${result.endsWith("\n") ? "" : "\n"}${SR_METADATA_CALLOUT} \n> `;
                 }
 
+                // The reference travels immediately before the schedule comment, so it
+                // inherits the plugin's own safe placement and can never land inside a
+                // code fence or a math block.
+                const scheduleFragment: string = ref ? `${ref} ${scheduleHtml}` : scheduleHtml;
+
                 if (blockId) {
                     if (
                         this.isCardCommentsOnSameLine(settings) ||
                         isScheduleInSRMetadataCallout ||
                         settings.useCalloutsForSchedulingComments
                     )
-                        result += ` ${scheduleHtml} ${blockId}`;
-                    else result += ` ${blockId}\n${scheduleHtml}`;
+                        result += ` ${scheduleFragment} ${blockId}`;
+                    else result += ` ${blockId}\n${scheduleFragment}`;
                 } else {
                     result +=
                         this.getHtmlCommentSeparator(
                             settings,
                             isScheduleInSRMetadataCallout ||
                                 settings.useCalloutsForSchedulingComments,
-                        ) + scheduleHtml;
+                        ) + scheduleFragment;
                 }
             } else {
                 if (blockId) {
                     result += ` ${blockId}`;
                 }
+                // A reference must still be emitted here, or it is lost on write-back
+                result = this.appendCardCommentRef(result, ref, settings);
             }
         } else {
-            // No schedule, so the block ID always comes after the question text, without anything after it
+            // No schedule, so the block ID always comes after the question text
             if (blockId) result += ` ${blockId}`;
+            result = this.appendCardCommentRef(result, ref, settings);
         }
         return result;
     }
@@ -286,6 +433,7 @@ export class Question {
 
         let newText = MultiLineTextFinder.findAndReplace(noteText, originalText, replacementText);
         if (newText) {
+            this.lastUpdateFoundOriginal = true;
             // Don't support changing the textDirection setting
             this.questionText = QuestionText.create(
                 replacementText,
@@ -293,6 +441,7 @@ export class Question {
                 settings,
             );
         } else {
+            this.lastUpdateFoundOriginal = false;
             console.warn(
                 `updateQuestionText: Text not found: ${originalText.substring(
                     0,

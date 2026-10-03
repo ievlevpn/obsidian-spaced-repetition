@@ -814,6 +814,99 @@ test("Test not parsing 'cards' in codeblocks", () => {
     ).toEqual([[CardType.SingleLineBasic, "Question::Answer", 0, 0]]);
 });
 
+test("Test footnote definitions are skipped entirely", () => {
+    // A definition whose text contains the card separator must not become a card.
+    // NOTE: "Q1:::A1" contains the reversed separator ":::" (checked before the basic "::"
+    // separator since inlineSeparators is sorted longest-first), so this parses as
+    // SingleLineReversed, matching the pre-existing "Question:::Answer" case above. That is
+    // unrelated to footnote skipping; what this test verifies is that the footnote text is
+    // excluded entirely rather than becoming a second, phantom card.
+    expect(
+        parseT(
+            "Q1:::A1 [^sr-a3f91c]\n\n[^sr-a3f91c]: - *2026-10-03:* beware a ::: in prose",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
+
+    // Nor one containing cloze syntax
+    expect(
+        parseT(
+            "Q1:::A1 [^sr-a3f91c]\n\n[^sr-a3f91c]: - *2026-10-03:* what about {{this}}",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
+
+    // A definition directly under a multi line card must not be absorbed into it, and the
+    // definition line TERMINATES the card, so lastLineNum is the card's true last content
+    // line (2) and not the definition's. It used to be inflated to one past the definition
+    // and its continuations, growing without bound with the definition's length.
+    expect(
+        parseT("F\n?\nA [^sr-b7102e]\n[^sr-b7102e]: - *2026-10-03:* x\n\n", parserOptions),
+    ).toEqual([[CardType.MultiLineBasic, "F\n?\nA [^sr-b7102e]", 0, 2]]);
+
+    // ...including when the definition carries continuations, which previously pushed
+    // lastLineNum out by one plus the continuation count.
+    expect(
+        parseT(
+            "F\n?\nA\n[^sr-b7102e]: - *2026-10-03:* x\n    - *2026-10-04:* y\n      more\n\nafter\n",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.MultiLineBasic, "F\n?\nA", 0, 2]]);
+
+    // A definition line INSIDE a card's text region ends the card there rather than being
+    // dropped mid-card. Dropping it left questionText.original non-contiguous in the note,
+    // so MultiLineTextFinder missed forever and the card's schedule silently never
+    // persisted. The card that remains is contiguous and therefore writable.
+    // The card ends at the definition exactly as it would at a blank line, so the answer
+    // side is empty rather than silently stitched across the definition.
+    const insideNote: string = "How do you write a footnote?\n?\n[^1]: the text\nand more answer\n";
+    expect(parseT(insideNote, parserOptions)).toEqual([
+        [CardType.MultiLineBasic, "How do you write a footnote?\n?", 0, 1],
+    ]);
+    expect(insideNote).toContain("How do you write a footnote?\n?");
+
+    // The same shape with content before the definition keeps that part as the card, and the
+    // card text is a contiguous slice of the note.
+    const noteText: string = "F\n?\nA line\n[^1]: the text\nand more answer\n";
+    const contiguous: [CardType, string, number, number][] = parseT(noteText, parserOptions);
+    expect(contiguous).toEqual([[CardType.MultiLineBasic, "F\n?\nA line", 0, 2]]);
+    expect(noteText).toContain(contiguous[0][1]);
+
+    // Multi-entry definitions, including indented continuations, are skipped wholesale
+    expect(
+        parseT(
+            "Q1:::A1 [^sr-a3f91c]\n\n[^sr-a3f91c]: - *2026-10-03:* first\n    - *2026-10-19:* a ::: here\n      continued\n",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
+
+    // The user's own footnotes are skipped too, which protects them from becoming cards
+    expect(parseT("Q1:::A1\n\n[^1]: see ::: this\n", parserOptions)).toEqual([
+        [CardType.SingleLineReversed, "Q1:::A1", 0, 0],
+    ]);
+
+    // A card after a definition still parses, with correct line numbers
+    expect(
+        parseT("[^sr-a3f91c]: - *2026-10-03:* x\n    - *2026-10-19:* y\nQ2:::A2", parserOptions),
+    ).toEqual([[CardType.SingleLineReversed, "Q2:::A2", 2, 2]]);
+});
+
+test("Test a card carrying a comment reference parses normally", () => {
+    // "Q1:::A1" parses as SingleLineReversed; see note in the test above.
+    expect(
+        parseT("Q1:::A1 [^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions),
+    ).toEqual([
+        [CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", 0, 0],
+    ]);
+
+    // Own-line schedule: the reference shares that line
+    expect(
+        parseT("Q1:::A1\n[^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", parserOptions),
+    ).toEqual([
+        [CardType.SingleLineReversed, "Q1:::A1\n[^sr-a3f91c] <!--SR:!2021-08-11,4,270-->", 0, 1],
+    ]);
+});
+
 describe("Parser debug messages", () => {
     test("Messages disabled", () => {
         // replace console error log with an empty mock function

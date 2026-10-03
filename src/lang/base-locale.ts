@@ -14,6 +14,7 @@ export interface IBaseLocale {
     TOTAL: string;
     BACK: string;
     SKIP: string;
+    CARD_NOTE_PLACEHOLDER: string;
     EDIT_CARD: string;
     RESET_CARD_PROGRESS: string;
     HARD: string;
