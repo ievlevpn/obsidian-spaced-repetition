@@ -1,6 +1,7 @@
 import { ClozeCrafter } from "clozecraft";
 
 import { SR_METADATA_CALLOUT } from "src/data/constants";
+import { containsMathCloze } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 
 export let debugParser = false;
@@ -196,8 +197,11 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             }
             cardText += "\n" + codeBlockClose;
             i++;
-        } else if (cardType === null && clozecrafter.isClozeNote(currentLine)) {
-            // Pick up cloze cards
+        } else if (
+            cardType === null &&
+            (clozecrafter.isClozeNote(currentLine) || containsMathCloze(currentLine))
+        ) {
+            // Pick up cloze cards (clozecraft patterns, or the \cloze{answer}{hint} LaTeX macro)
             cardType = CardType.Cloze;
         }
     }

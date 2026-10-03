@@ -491,6 +491,16 @@ test("Test parsing of cloze cards", () => {
         }),
     ).toEqual([]);
 
+    // \cloze{answer}{hint} LaTeX macro (detected regardless of configured clozePatterns)
+    expect(parseT("$\\cloze{c^2}{}$ = a^2 + b^2", parserOptions)).toEqual([
+        [CardType.Cloze, "$\\cloze{c^2}{}$ = a^2 + b^2", 0, 0],
+    ]);
+    expect(parseT("$$\n\\cloze{a^2}{} + \\cloze{b^2}{} = c^2\n$$\n", parserOptions)).toEqual([
+        [CardType.Cloze, "$$\n\\cloze{a^2}{} + \\cloze{b^2}{} = c^2\n$$", 0, 2],
+    ]);
+    // \clozeXYZ must NOT be picked up (command boundary)
+    expect(parseT("$\\clozenot{a}{b}$", parserOptions)).toEqual([]);
+
     // custom cloze formats
     // Anki-like pattern
     //  Notice that the single line separators have to be different
