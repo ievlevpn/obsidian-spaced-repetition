@@ -6,6 +6,7 @@ import { Question } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { CommentParser } from "src/utils/comment-parser";
+import { upsertFootnoteDefinition } from "src/utils/note-footnotes";
 import { MultiLineTextFinder } from "src/utils/strings";
 
 export class NotesDataStore implements IDataStore {
@@ -89,7 +90,21 @@ export class NotesDataStore implements IDataStore {
      */
     async write(question: Question): Promise<void> {
         const fileText: string = await question.note.file.read();
-        const newText: string = question.updateQuestionWithinNoteText(fileText, this.settings);
+
+        // Resolve the comment FIRST: it may allocate the footnote label, which must be on
+        // the question before updateQuestionWithinNoteText emits the reference token.
+        const definition: string | null = question.resolveCardComment(fileText);
+
+        let newText: string = question.updateQuestionWithinNoteText(fileText, this.settings);
+
+        // The definition lives outside any card's text, so it is a separate pure transform
+        // over the same note text - composed here to keep this a single read and write.
+        const label: string | null = question.questionText.cardCommentRef;
+        if (definition && label) {
+            newText = upsertFootnoteDefinition(newText, label, definition);
+            question.cardCommentDefinition = definition;
+        }
+
         await question.note.file.write(newText);
         question.hasChanged = false;
     }

@@ -14,7 +14,13 @@ import {
 import { SRSettings } from "src/data/settings";
 import { Note } from "src/note/note";
 import { ParsedQuestionInfo } from "src/parser";
-import { extractCardCommentRef, formatCardCommentRef } from "src/utils/card-comment";
+import {
+    appendCardCommentEntry,
+    extractCardCommentRef,
+    formatCardCommentRef,
+    generateCardCommentLabel,
+} from "src/utils/card-comment";
+import { collectCardCommentLabels, findFootnoteDefinition } from "src/utils/note-footnotes";
 import { cyrb53, MultiLineTextFinder, stringTrimStart, TextDirection } from "src/utils/strings";
 
 export enum CardType {
@@ -238,6 +244,13 @@ export class Question {
     cards: Card[];
     hasChanged: boolean;
 
+    // The footnote definition holding this card's comments, as read from the note, or null
+    cardCommentDefinition: string | null = null;
+
+    // Staged comment text/date, set by stageCardComment() and consumed by resolveCardComment()
+    private pendingCardCommentText: string | null = null;
+    private pendingCardCommentDate: string | null = null;
+
     get questionType(): CardType {
         return this.parsedQuestionInfo.cardType;
     }
@@ -285,6 +298,40 @@ export class Question {
         if (this.questionText.cardCommentRef === label) return;
         this.questionText.cardCommentRef = label;
         this.hasChanged = true;
+    }
+
+    /** Records comment text to be written by the next write of this question. */
+    stageCardComment(text: string, date: string): void {
+        this.pendingCardCommentText = text;
+        this.pendingCardCommentDate = date;
+        this.hasChanged = true;
+    }
+
+    /**
+     * Resolves any staged comment against the note's current text: allocates a footnote
+     * label if this card has none, and returns the definition to write. Returns null when
+     * nothing is staged. Called by the data store, which has already read the note.
+     */
+    resolveCardComment(noteText: string): string | null {
+        const text: string | null = this.pendingCardCommentText;
+        const date: string | null = this.pendingCardCommentDate;
+        this.pendingCardCommentText = null;
+        this.pendingCardCommentDate = null;
+        if (!text || !date) return null;
+
+        let label: string | null = this.questionText.cardCommentRef;
+        if (!label) {
+            label = generateCardCommentLabel(collectCardCommentLabels(noteText));
+            this.setCardCommentRef(label);
+        }
+
+        const definition: string | null = appendCardCommentEntry(
+            this.cardCommentDefinition ?? findFootnoteDefinition(noteText, label),
+            label,
+            text,
+            date,
+        );
+        return definition;
     }
 
     formatForNote(settings: SRSettings): string {

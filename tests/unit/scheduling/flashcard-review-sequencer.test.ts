@@ -95,6 +95,13 @@ class TestContext {
         return deckTree;
     }
 
+    // Re-parses the given text into the sequencer, e.g. to pick up changes written by a
+    // previous processReview()/flushPendingCardComment() call within the same test.
+    async setSequencerDeckTreeFromOriginalTextWith(text: string): Promise<Deck> {
+        this.file.content = text;
+        return this.setSequencerDeckTreeFromOriginalText();
+    }
+
     getDeckStats(topicTag: string): DeckStats {
         return this.reviewSequencer.getDeckStats(TopicPath.getTopicPathFromTag(topicTag));
     }
@@ -912,6 +919,135 @@ ${indent}- bar?::baz
                 expect(c.reviewSequencer.hasCurrentCard).toEqual(false);
             });
         });
+    });
+});
+
+describe("card comments", () => {
+    const settings: SRSettings = { ...DEFAULT_SETTINGS };
+    settings.cardCommentOnSameLine = true;
+
+    async function contextWith(text: string): Promise<TestContext> {
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            settings,
+            text,
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        return c;
+    }
+
+    test("a staged comment creates a reference and a definition in one write", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("a thought");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toMatch(/#flashcards Q1::A1 \[\^sr-[0-9a-f]{6}\] <!--SR:![^\n]+-->/);
+        expect(fileText).toMatch(/\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* a thought/);
+    });
+
+    test("blank staged text writes no reference and no definition", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("   \n  ");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).not.toContain("[^sr-");
+    });
+
+    test("a second comment extends the same definition and reuses the label", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* earlier",
+        );
+
+        c.reviewSequencer.setPendingCardComment("later");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("[^sr-a3f91c]: - *2026-01-01:* earlier");
+        expect(fileText).toContain("    - *2023-09-06:* later");
+        expect(fileText.match(/\[\^sr-a3f91c\]:/g)).toHaveLength(1);
+        expect(fileText.match(/\[\^sr-/g)).toHaveLength(2); // one reference, one definition
+    });
+
+    test("a staged comment cannot leak onto the next card", async () => {
+        const c: TestContext = await contextWith(
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n\n#flashcards Q2::A2 <!--SR:!2023-09-02,4,270-->",
+        );
+
+        c.reviewSequencer.setPendingCardComment("only for the first card");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        const fileText: string = await c.file.read();
+        expect(fileText.match(/\[\^sr-[0-9a-f]{6}\]:/g)).toHaveLength(1);
+    });
+
+    test("flushPendingCardComment writes without rating the card", async () => {
+        const c: TestContext = await contextWith("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+
+        c.reviewSequencer.setPendingCardComment("jotted, then skipped");
+        await c.reviewSequencer.flushPendingCardComment();
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("- *2023-09-06:* jotted, then skipped");
+        expect(fileText).toContain("<!--SR:!2023-09-02,4,270-->"); // schedule untouched
+    });
+
+    test("repeated commented reviews converge: prose around the card is untouched", async () => {
+        const original = [
+            "# Heading",
+            "",
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+            "",
+            "prose below the card",
+            "",
+            "[^1]: the user's own footnote",
+            "",
+        ].join("\n");
+        const c: TestContext = await contextWith(original);
+
+        // ReviewResponse.Again (not Good): with the card's starting schedule
+        // (interval 4, overdue from 2023-09-02), a Good response pushes the new due date to
+        // 2023-09-17 - no longer due "today" (2023-09-06) once the note is re-parsed, so the
+        // loop's second iteration would find no current card. Again sets interval to 0, whose
+        // due date is always "today", so the same card stays due across all three iterations -
+        // confirmed by hand with a standalone repro before adjusting this from the brief's
+        // original ReviewResponse.Good.
+        for (const text of ["one", "two", "three"]) {
+            c.reviewSequencer.setPendingCardComment(text);
+            await c.reviewSequencer.processReview(ReviewResponse.Again);
+            await c.setSequencerDeckTreeFromOriginalTextWith(await c.file.read());
+        }
+
+        const fileText: string = await c.file.read();
+        expect(fileText).toContain("# Heading");
+        expect(fileText).toContain("prose below the card");
+        expect(fileText).toContain("[^1]: the user's own footnote");
+        // exactly one definition, holding all three entries
+        expect(fileText.match(/\[\^sr-[0-9a-f]{6}\]:/g)).toHaveLength(1);
+        expect(fileText).toContain("*2023-09-06:* one");
+        expect(fileText).toContain("*2023-09-06:* two");
+        expect(fileText).toContain("*2023-09-06:* three");
+    });
+
+    test("cram mode writes nothing", async () => {
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Cram,
+            settings,
+            "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->",
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        const before: string = await c.file.read();
+
+        c.reviewSequencer.setPendingCardComment("should not be written");
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+        expect(await c.file.read()).toBe(before);
     });
 });
 

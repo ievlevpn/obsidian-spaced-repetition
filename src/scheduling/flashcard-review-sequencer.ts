@@ -1,6 +1,6 @@
 import { Notice } from "obsidian";
 
-import { TICKS_PER_DAY } from "src/data/constants";
+import { PREFERRED_DATE_FORMAT, TICKS_PER_DAY } from "src/data/constants";
 import { DataStore } from "src/data/data-store/base/data-store";
 import { Card } from "src/data/data-structures/card/card";
 import { Question, QuestionText } from "src/data/data-structures/card/questions/question";
@@ -38,6 +38,8 @@ export interface IFlashcardReviewSequencer {
     skipCurrentCard(): void;
     determineCardSchedule(response: ReviewResponse, card: Card): RepItemScheduleInfo;
     processReview(response: ReviewResponse): Promise<void>;
+    setPendingCardComment(text: string): void;
+    flushPendingCardComment(): Promise<void>;
     updateCurrentQuestionTextAndCards(text: string): Promise<void>;
     deleteCurrentCardFromNote(): Promise<void>;
 }
@@ -125,6 +127,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     private dueDateFlashcardHistogram: DueDateHistogram;
     private pendingCards: PendingCard[] = [];
     private currentTopicPath: TopicPath = TopicPath.emptyPath;
+    private pendingCardComment: string | null = null;
 
     constructor(
         reviewMode: FlashcardReviewMode,
@@ -268,6 +271,41 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this.cardSequencer.deleteCurrentRepItemFromAllDecks();
     }
 
+    /**
+     * Stages comment text typed during review of the current card. It is applied just before
+     * the next schedule write, so a comment costs no extra file write.
+     */
+    setPendingCardComment(text: string): void {
+        if (this.reviewMode === FlashcardReviewMode.Cram) return;
+        this.pendingCardComment = text;
+    }
+
+    /** Applies any staged comment to the current question. Returns true if it changed. */
+    private applyPendingCardComment(): boolean {
+        const text: string | null = this.pendingCardComment;
+        this.pendingCardComment = null;
+        if (this.reviewMode === FlashcardReviewMode.Cram) return false;
+        if (!text || text.trim().length === 0) return false;
+
+        const question = this.currentQuestion;
+        if (!question) return false;
+
+        question.stageCardComment(text, globalDateProvider.today.format(PREFERRED_DATE_FORMAT));
+        return true;
+    }
+
+    /**
+     * Writes a staged comment immediately, for exits that never rate the card
+     * (skip, back to the deck list, closing the view, editing or deleting the card).
+     */
+    async flushPendingCardComment(): Promise<void> {
+        const question = this.currentQuestion;
+        if (!this.applyPendingCardComment() || !question) return;
+        // Routed through the data store so the label allocation and the definition write
+        // go through the same single composed read-modify-write as a rated card.
+        await DataStore.getInstance().write(question);
+    }
+
     async processReview(response: ReviewResponse): Promise<void> {
         switch (this.reviewMode) {
             case FlashcardReviewMode.Review:
@@ -281,6 +319,12 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     }
 
     async processReviewReviewMode(response: ReviewResponse): Promise<void> {
+        // Resetting a new card performs no schedule write, so flush any staged comment now
+        // or it would otherwise sit unwritten until some later write occurs.
+        if (response === ReviewResponse.Reset && !this.currentCard.hasSchedule) {
+            await this.flushPendingCardComment();
+        }
+
         let shortTermRequeue: "none" | "immediate" | "pending" = "none";
         if (response !== ReviewResponse.Reset || this.currentCard.hasSchedule) {
             const oldSchedule = this.currentCard.scheduleInfo;
@@ -291,6 +335,9 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
             // Nothing to do if a user resets a new card
             this.currentCard.scheduleInfo = this.determineCardSchedule(response, this.currentCard);
             shortTermRequeue = this.getShortTermRequeueMode(this.currentCard.scheduleInfo);
+
+            // Fold any comment typed during this card into the same write
+            this.applyPendingCardComment();
 
             // Update the source file with the updated schedule
             await DataStore.getInstance().writeSchedule(this.currentQuestion);
