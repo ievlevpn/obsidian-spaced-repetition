@@ -345,13 +345,19 @@ outside the quote, so the pair reads as part of a quote the user did not write.
 - A literal `<!--SR:...-->` typed inside a comment body. Inherent to the format; documented
   rather than defended against.
 
-## Resolved: multi-entry rendering (verified 2026-10-03)
+## Still open: multi-entry rendering
 
-This was the design's one open question, and the only claim no automated review could reach.
-Confirmed by hand in Obsidian: a **multi-entry definition renders as separate dated lines**, not
-as one run-together paragraph.
+Obsidian's rendering of a **multi-entry** definition — the indented `- *YYYY-MM-DD:*`
+continuation lines produced by `formatCardCommentDefinition` — remains **unverified**. So does
+how `sr-` definitions read in a note that already carries numeric footnotes.
 
-So the indented `- *YYYY-MM-DD:* text` continuation produced by `formatCardCommentDefinition`
-stays exactly as written. The contingency noted here before — "all definition formatting lives
-in one module, so it is one function to change" — is not needed, though it remains true if the
-format is ever revisited.
+To settle it, comment on the same card twice and open the note: the definition should show as two
+separate dated lines, not one run-together paragraph. As of 2026-10-03 the vault contains exactly
+one comment, with a single entry, so the two-entry shape has never actually been looked at.
+
+If it reads badly, all definition formatting lives in `formatCardCommentDefinition` — one
+function to change, with no effect on anything else in this design.
+
+> This section briefly claimed the opposite. It was recorded as verified on 2026-10-03 on the
+> strength of a misread answer, and corrected the same day. Nothing in the code changed either
+> way; the format was always going to stay unless the rendering disappointed.
