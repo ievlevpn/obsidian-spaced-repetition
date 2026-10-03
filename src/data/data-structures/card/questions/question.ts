@@ -255,6 +255,17 @@ export class Question {
         return sep;
     }
 
+    /**
+     * Appends the comment reference where the schedule comment would have gone. Used on the
+     * paths that have no schedule comment to sit in front of, so the reference still inherits
+     * the plugin's own same-line/own-line placement decision.
+     */
+    private appendCardCommentRef(result: string, ref: string, settings: SRSettings): string {
+        if (!ref) return result;
+        const trimmed: string = result.trimEnd();
+        return trimmed + (this.isCardCommentsOnSameLine(settings) ? ` ${ref}` : `\n${ref}`);
+    }
+
     isCardCommentsOnSameLine(settings: SRSettings): boolean {
         let result: boolean = settings.cardCommentOnSameLine;
         // Schedule info must be on next line if last block is a codeblock
@@ -323,15 +334,13 @@ export class Question {
                 if (blockId) {
                     result += ` ${blockId}`;
                 }
+                // A reference must still be emitted here, or it is lost on write-back
+                result = this.appendCardCommentRef(result, ref, settings);
             }
         } else {
             // No schedule, so the block ID always comes after the question text
             if (blockId) result += ` ${blockId}`;
-            // The reference still uses the placement the schedule would have used
-            if (ref) {
-                result = result.trimEnd();
-                result += this.isCardCommentsOnSameLine(settings) ? ` ${ref}` : `\n${ref}`;
-            }
+            result = this.appendCardCommentRef(result, ref, settings);
         }
         return result;
     }

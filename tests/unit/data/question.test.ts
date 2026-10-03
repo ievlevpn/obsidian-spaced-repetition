@@ -318,5 +318,41 @@ describe("Question", () => {
             expect(question.questionText.cardCommentRef).toBe("sr-a3f91c");
             expect(question.hasChanged).toBe(true);
         });
+
+        test("emits the reference even if the schedule algorithm returns nothing", () => {
+            const original = "Q1::A1 [^sr-a3f91c]";
+            const question = new Question({
+                questionText: QuestionText.create(
+                    original,
+                    TextDirection.Ltr,
+                    settingsCardCommentOnSameLine,
+                ),
+                cards: [
+                    new Card({
+                        scheduleInfo: RepItemScheduleInfoOsr.fromDueDateStr("2023-09-06", 1, 250),
+                    }),
+                ],
+            });
+            DataStoreAlgorithm.instance = {
+                questionFormatScheduleAsHtmlComment: jest.fn(() => ""),
+            };
+
+            expect(question.formatForNote(settingsCardCommentOnSameLine)).toBe(original);
+        });
+
+        test("round-trips a reference and a block id on a card with no schedule", () => {
+            const original = "Q1::A1 ^abc123 [^sr-a3f91c]";
+            const questionText = QuestionText.create(
+                original,
+                TextDirection.Ltr,
+                settingsCardCommentOnSameLine,
+            );
+            const question = new Question({ questionText, cards: [new Card({})] });
+
+            expect(questionText.actualQuestion).toBe("Q1::A1");
+            expect(questionText.obsidianBlockId).toBe("^abc123");
+            expect(questionText.cardCommentRef).toBe("sr-a3f91c");
+            expect(question.formatForNote(settingsCardCommentOnSameLine)).toBe(original);
+        });
     });
 });
