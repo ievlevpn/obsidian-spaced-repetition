@@ -51,6 +51,7 @@ export class CardContainer {
     private skipCardHandler: () => void;
     private showAnswerHandler: () => void;
     private jumpToCardHandler: () => Promise<void>;
+    private undoHandler: () => Promise<void>;
 
     constructor(
         app: App,
@@ -65,6 +66,7 @@ export class CardContainer {
         showAnswerHandler: () => void,
         jumpToCurrentCardHandler: () => Promise<void>,
         displayCurrentCardInfoNoticeHandler: () => void,
+        undoHandler: () => Promise<void>,
         closeModal?: () => void,
     ) {
         // Init properties
@@ -75,6 +77,7 @@ export class CardContainer {
         this.skipCardHandler = skipCardHandler;
         this.showAnswerHandler = showAnswerHandler;
         this.jumpToCardHandler = jumpToCurrentCardHandler;
+        this.undoHandler = undoHandler;
 
         // Build ui
         this.view = parentEl.createDiv();
@@ -102,6 +105,7 @@ export class CardContainer {
                     },
                 ).open();
             },
+            () => void this.undoHandler(),
             closeModal,
         );
 
@@ -140,6 +144,15 @@ export class CardContainer {
     }
 
     // #region -> public methods
+
+    /**
+     * Enables or greys out the undo button.
+     *
+     * @param available - Whether there is something to undo
+     */
+    setUndoAvailable(available: boolean): void {
+        this.toolbar.setUndoButtonDisabled(!available);
+    }
 
     /**
      * Shows the FlashcardView if it is hidden
@@ -472,6 +485,10 @@ export class CardContainer {
                 break;
             case "KeyJ":
                 void this.jumpToCardHandler();
+                consumeKeyEvent();
+                break;
+            case "KeyU":
+                void this.undoHandler();
                 consumeKeyEvent();
                 break;
             case "Enter":

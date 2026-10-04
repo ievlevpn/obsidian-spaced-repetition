@@ -84,6 +84,14 @@ export interface IDeckTreeIterator {
      * @returns {boolean} - True if there is a next repetition item, false otherwise.
      */
     nextRepItem(): boolean;
+    /**
+     * Makes `repItem` the current item, if it is in one of the decks being iterated (the decks
+     * under the current topic path). Used to return to a card when a review is undone.
+     *
+     * @param {RepetitionItem} repItem - The item to select.
+     * @returns {boolean} - True if the item was found and selected.
+     */
+    jumpToRepItem(repItem: RepetitionItem): boolean;
 }
 
 class SingleDeckIterator {
@@ -324,6 +332,22 @@ export class DeckTreeIterator implements IDeckTreeIterator {
         const iteratorDeck: Deck = this.baseDeckTree.getDeck(topicPath);
         this.deckArray = DeckTreeIterator.filterForDecksWithCards(iteratorDeck.toDeckArray());
         this.setDeckIdx(null);
+    }
+
+    jumpToRepItem(repItem: RepetitionItem): boolean {
+        for (let deckIdx = 0; deckIdx < (this.deckArray?.length ?? 0); deckIdx++) {
+            const deck: Deck = this.deckArray[deckIdx];
+            for (const listType of [RepItemState.NewItem, RepItemState.DueItem]) {
+                const list: RepetitionItem[] =
+                    listType === RepItemState.NewItem ? deck.newRepItems : deck.dueRepItems;
+                const idx: number = list.indexOf(repItem);
+                if (idx < 0) continue;
+                this.setDeckIdx(deckIdx);
+                this.singleDeckIterator.setRepItemIdx(listType, idx);
+                return true;
+            }
+        }
+        return false;
     }
 
     private static filterForDecksWithCards(sourceArray: Deck[]): Deck[] {

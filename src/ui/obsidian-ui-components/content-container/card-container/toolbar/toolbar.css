@@ -142,3 +142,8 @@
 .is-mobile .sr-card-toolbar .sr-skip-button {
     display: flex;
 }
+
+/* Undo stays visible everywhere, like Skip on mobile: an accidental answer should be one tap away. */
+.sr-card-toolbar .sr-undo-button {
+    display: flex;
+}

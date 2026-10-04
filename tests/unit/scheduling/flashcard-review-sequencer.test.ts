@@ -1172,7 +1172,9 @@ describe("card comments", () => {
             await c.reviewSequencer.processReview(ReviewResponse.Again);
 
             const fileText: string = await c.file.read();
-            expect(fileText).toMatch(/\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* fine on a unique card/);
+            expect(fileText).toMatch(
+                /\[\^sr-[0-9a-f]{6}\]: - \*2023-09-06:\* fine on a unique card/,
+            );
         });
     });
 
@@ -1891,5 +1893,141 @@ describe("\\cloze{answer}{hint} math cloze cards (end-to-end)", () => {
         await c.setSequencerDeckTreeFromOriginalText();
 
         expect(c.cardSequencer.currentDeck.getRepItemCount(RepItemState.AnyItem, false)).toEqual(2);
+    });
+});
+
+describe("undo", () => {
+    // Same-line schedule comments, as in the vault, so a restored note is byte-identical
+    const sameLine: SRSettings = { ...DEFAULT_SETTINGS, cardCommentOnSameLine: true };
+    const create = (
+        text: string,
+        settings: SRSettings = sameLine,
+        mode = FlashcardReviewMode.Review,
+    ) => TestContext.Create(orderDueFirstSequential, mode, settings, text);
+
+    test("nothing to undo at the start", async () => {
+        const c = create("#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->");
+        await c.setSequencerDeckTreeFromOriginalText();
+        expect(c.reviewSequencer.canUndo).toBe(false);
+        expect(await c.reviewSequencer.undo()).toBe(false);
+    });
+
+    test("undoing a rating restores the schedule in the note and returns to the card", async () => {
+        const text = `#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->
+#flashcards Q2::A2 <!--SR:!2023-09-02,5,270-->`;
+        const c = create(text);
+        await c.setSequencerDeckTreeFromOriginalText();
+
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+        expect(c.file.content).not.toEqual(text);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        expect(c.reviewSequencer.canUndo).toBe(true);
+
+        expect(await c.reviewSequencer.undo()).toBe(true);
+        expect(c.file.content).toEqual(text);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.reviewSequencer.currentCard.scheduleInfo).toMatchObject({
+            latestEase: 270,
+            interval: 4,
+        });
+        expect(c.reviewSequencer.canUndo).toBe(false);
+    });
+
+    test("undoing the first rating of a new card removes its schedule comment", async () => {
+        const text = "#flashcards Q1::A1\n#flashcards Q2::A2";
+        const c = create(text);
+        await c.setSequencerDeckTreeFromOriginalText();
+
+        await c.reviewSequencer.processReview(ReviewResponse.Easy);
+        expect(c.file.content).toContain("<!--SR:");
+        await c.reviewSequencer.undo();
+        expect(c.file.content).toEqual(text);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.reviewSequencer.currentCard.hasSchedule).toBe(false);
+    });
+
+    test("undoing a skip returns to the skipped card without touching the note", async () => {
+        const text = "#flashcards Q1::A1\n#flashcards Q2::A2";
+        const c = create(text);
+        await c.setSequencerDeckTreeFromOriginalText();
+
+        c.reviewSequencer.skipCurrentCard();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.file.content).toEqual(text);
+    });
+
+    test("several undos in a row walk back through the session", async () => {
+        const text = `#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->
+#flashcards Q2::A2 <!--SR:!2023-09-02,5,270-->
+#flashcards Q3::A3 <!--SR:!2023-09-02,6,270-->`;
+        const c = create(text);
+        await c.setSequencerDeckTreeFromOriginalText();
+
+        await c.reviewSequencer.processReview(ReviewResponse.Hard);
+        c.reviewSequencer.skipCurrentCard();
+        await c.reviewSequencer.processReview(ReviewResponse.Easy);
+        expect(c.reviewSequencer.hasCurrentCard).toBe(false);
+
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q3");
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.file.content).toEqual(text);
+        expect(c.reviewSequencer.canUndo).toBe(false);
+    });
+
+    test("undo brings back buried siblings and clears the postponement it caused", async () => {
+        const settings: SRSettings = { ...sameLine, burySiblingCards: true };
+        const text = "#flashcards A ==b== and ==c==\n\n#flashcards Q2::A2";
+        const c = create(text, settings);
+        await c.setSequencerDeckTreeFromOriginalText();
+        expect(c.reviewSequencer.currentCard.front).toContain("[...]");
+
+        await c.reviewSequencer.processReview(ReviewResponse.Good);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2"); // sibling buried
+        checkQuestionPostponementListCount(c, 1);
+
+        await c.reviewSequencer.undo();
+        checkQuestionPostponementListCount(c, 0);
+        expect(c.file.content).toEqual(text);
+        c.reviewSequencer.skipCurrentCard(); // skips the whole question again
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toContain("[...]");
+    });
+
+    test("cram mode: undo returns to the card, nothing is written", async () => {
+        const text = "#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->\n#flashcards Q2::A2";
+        const c = create(text, sameLine, FlashcardReviewMode.Cram);
+        await c.setSequencerDeckTreeFromOriginalText();
+
+        await c.reviewSequencer.processReview(ReviewResponse.Easy);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        await c.reviewSequencer.undo();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.file.content).toEqual(text);
+    });
+
+    test("switching to another deck starts a new history; refreshing the same deck keeps it", async () => {
+        const text = "#flashcards/a Q1::A1\n#flashcards/a Q2::A2\n#flashcards/b Q3::A3";
+        const c = create(text);
+        await c.setSequencerDeckTreeFromOriginalText();
+        c.reviewSequencer.skipCurrentCard();
+        c.reviewSequencer.refreshCurrentDeck();
+        expect(c.reviewSequencer.canUndo).toBe(true);
+        c.reviewSequencer.setCurrentDeck(TopicPath.getTopicPathFromTag("#flashcards/b"));
+        expect(c.reviewSequencer.canUndo).toBe(false);
+    });
+
+    test("editing the card's text clears the history", async () => {
+        const c = create("#flashcards Q1::A1\n#flashcards Q2::A2");
+        await c.setSequencerDeckTreeFromOriginalText();
+        c.reviewSequencer.skipCurrentCard();
+        await c.reviewSequencer.updateCurrentQuestionTextAndCards("#flashcards Q2::A2 edited");
+        expect(c.reviewSequencer.canUndo).toBe(false);
     });
 });

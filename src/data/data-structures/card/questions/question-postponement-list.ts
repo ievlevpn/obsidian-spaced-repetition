@@ -32,6 +32,18 @@ export interface IQuestionPostponementList {
      * @returns {Promise<void>} - A promise that resolves when the list is written.
      */
     write(): Promise<void>;
+    /**
+     * A copy of the list, for undoing a review.
+     *
+     * @returns {string[]} - The postponed question identifiers.
+     */
+    snapshot(): string[];
+    /**
+     * Replaces the list with an earlier snapshot (without writing it).
+     *
+     * @param {string[]} list - A list returned by snapshot().
+     */
+    restore(list: string[]): void;
 }
 
 /**
@@ -48,6 +60,14 @@ export class QuestionPostponementList implements IQuestionPostponementList {
         this.pluginDataManager = pluginDataManager;
         this.settings = settings;
         this.list = list;
+    }
+
+    snapshot(): string[] {
+        return [...this.list];
+    }
+
+    restore(list: string[]): void {
+        this.list = [...list];
     }
 
     /**

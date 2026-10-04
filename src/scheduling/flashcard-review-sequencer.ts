@@ -36,6 +36,8 @@ export interface IFlashcardReviewSequencer {
     getDeckStats(topicPath: TopicPath): DeckStats;
     getSubDecksWithCardsInQueue(deck: Deck): Deck[];
     skipCurrentCard(): void;
+    get canUndo(): boolean;
+    undo(): Promise<boolean>;
     determineCardSchedule(response: ReviewResponse, card: Card): RepItemScheduleInfo;
     processReview(response: ReviewResponse): Promise<void>;
     setPendingCardComment(text: string): void;
@@ -112,6 +114,21 @@ interface PendingCard {
     dueUnix: number;
 }
 
+// The review state just before a rating or skip, so it can be undone
+interface UndoEntry {
+    card: Card;
+    scheduleInfo: RepItemScheduleInfo | null;
+    // Whether the action wrote a new schedule to the note, which undo then writes back
+    wroteSchedule: boolean;
+    deckItems: { deck: Deck; newRepItems: Deck["newRepItems"]; dueRepItems: Deck["dueRepItems"] }[];
+    pendingCards: PendingCard[];
+    histogram: Map<number, number>;
+    postponementList: string[];
+}
+
+// How many actions can be undone in a row
+const MAX_UNDO = 50;
+
 export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     // We need the original deck tree so that we can still provide the total cards in each deck
     private _originalDeckTree: Deck;
@@ -128,6 +145,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     private pendingCards: PendingCard[] = [];
     private currentTopicPath: TopicPath = TopicPath.emptyPath;
     private pendingCardComment: string | null = null;
+    private undoStack: UndoEntry[] = [];
 
     constructor(
         reviewMode: FlashcardReviewMode,
@@ -187,10 +205,18 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this._originalDeckTree = originalDeckTree;
         this.remainingDeckTree = remainingDeckTree;
         this.pendingCards = [];
+        this.undoStack = [];
         this.setCurrentDeck(TopicPath.emptyPath);
     }
 
     setCurrentDeck(topicPath: TopicPath): void {
+        // A different deck starts a new history: undo only returns to cards of the deck in review
+        if (
+            !topicPath.isSameOrAncestorOf(this.currentTopicPath) ||
+            !this.currentTopicPath.isSameOrAncestorOf(topicPath)
+        ) {
+            this.undoStack = [];
+        }
         this.currentTopicPath = topicPath;
         this.wakeDuePendingCards();
         this.cardSequencer.setIteratorTopicPath(topicPath);
@@ -264,7 +290,74 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     }
 
     skipCurrentCard(): void {
+        this.pushUndo();
         this.cardSequencer.deleteCurrentQuestionFromAllDecks();
+    }
+
+    get canUndo(): boolean {
+        return this.undoStack.length > 0;
+    }
+
+    /**
+     * Undoes the most recent rating or skip: the card's previous schedule is restored (and
+     * written back to the note if the rating had written one), the queues are put back as they
+     * were, and the card becomes the current card again.
+     *
+     * @returns True if something was undone
+     */
+    async undo(): Promise<boolean> {
+        const entry: UndoEntry | undefined = this.undoStack.pop();
+        if (!entry) return false;
+
+        if (entry.wroteSchedule) {
+            entry.card.scheduleInfo = entry.scheduleInfo;
+            await DataStore.getInstance().writeSchedule(entry.card.question);
+        }
+        const postponementChanged: boolean =
+            entry.postponementList.join("\n") !==
+            this.questionPostponementList.snapshot().join("\n");
+        if (postponementChanged) {
+            this.questionPostponementList.restore(entry.postponementList);
+            await this.questionPostponementList.write();
+        }
+        for (const { deck, newRepItems, dueRepItems } of entry.deckItems) {
+            deck.newRepItems = [...newRepItems];
+            deck.dueRepItems = [...dueRepItems];
+        }
+        this.pendingCards = [...entry.pendingCards];
+        this.dueDateFlashcardHistogram.dueDatesMap = new Map(entry.histogram);
+
+        this.cardSequencer.setIteratorTopicPath(this.currentTopicPath);
+        if (!this.cardSequencer.jumpToRepItem(entry.card)) this.cardSequencer.nextRepItem();
+        return true;
+    }
+
+    // Records the state before an action on the current card
+    private pushUndo(): UndoEntry | null {
+        const card: Card | null = this.currentCard;
+        if (!card || !this.remainingDeckTree) return null;
+        const deckItems: UndoEntry["deckItems"] = [];
+        const collect = (deck: Deck) => {
+            deckItems.push({
+                deck,
+                newRepItems: [...deck.newRepItems],
+                dueRepItems: [...deck.dueRepItems],
+            });
+            deck.subdecks.forEach(collect);
+        };
+        collect(this.remainingDeckTree);
+        const entry: UndoEntry = {
+            card,
+            scheduleInfo: card.scheduleInfo,
+            wroteSchedule: false,
+            deckItems,
+            pendingCards: [...this.pendingCards],
+            histogram: new Map(this.dueDateFlashcardHistogram.dueDatesMap),
+            postponementList: this.questionPostponementList.snapshot(),
+        };
+        this.undoStack.push(entry);
+        if (this.undoStack.length > MAX_UNDO) this.undoStack.shift();
+        return entry;
     }
 
     private deleteCurrentCard(): void {
@@ -307,6 +400,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     }
 
     async processReview(response: ReviewResponse): Promise<void> {
+        this.pushUndo();
         switch (this.reviewMode) {
             case FlashcardReviewMode.Review:
                 await this.processReviewReviewMode(response);
@@ -341,6 +435,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 
             // Update the source file with the updated schedule
             await DataStore.getInstance().writeSchedule(this.currentQuestion);
+            const undoEntry: UndoEntry | undefined = this.undoStack[this.undoStack.length - 1];
+            if (undoEntry?.card === this.currentCard) undoEntry.wroteSchedule = true;
 
             if (oldSchedule) {
                 const now: number = globalDateProvider.now.valueOf();
@@ -473,6 +569,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     }
 
     async updateCurrentQuestionTextAndCards(text: string): Promise<void> {
+        // The card objects are replaced, so earlier undo entries would point at stale cards
+        this.undoStack = [];
         const question = this.currentQuestion;
         const q: QuestionText = question.questionText;
 
@@ -500,6 +598,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     }
 
     async deleteCurrentCardFromNote(): Promise<void> {
+        // The card objects are replaced, so earlier undo entries would point at stale cards
+        this.undoStack = [];
         const question = this.currentQuestion;
         await DataStore.getInstance().delete(question);
         this._originalDeckTree.deleteQuestionFromAllDecks(question, false);
