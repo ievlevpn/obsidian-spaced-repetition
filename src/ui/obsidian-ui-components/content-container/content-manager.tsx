@@ -126,6 +126,7 @@ export default class ContentManager {
             this._showAnswer.bind(this),
             this._jumpToCurrentCard.bind(this),
             this._displayCurrentCardInfoNotice.bind(this),
+            this._undo.bind(this),
             closeModal,
         );
     }
@@ -202,6 +203,7 @@ export default class ContentManager {
         if (this.sessionData === null) return;
         this.uiManager.setUIState(UIState.CardFront);
         await this.cardContainer.openSession(this.sessionData, this.settings);
+        this.cardContainer.setUndoAvailable(this.reviewSequencer?.canUndo ?? false);
     }
 
     private async _showNextCard(): Promise<void> {
@@ -258,6 +260,7 @@ export default class ContentManager {
             this.sessionData.cardData.currentCard !== undefined
         ) {
             await this.cardContainer.drawCardFront(this.sessionData, this.settings);
+            this.cardContainer.setUndoAvailable(this.reviewSequencer.canUndo);
         } else {
             await this._showDecksList(true);
         }
@@ -481,6 +484,17 @@ export default class ContentManager {
         await this.reviewSequencer.flushPendingCardComment();
         this.reviewSequencer.skipCurrentCard();
         await this._showNextCard();
+    }
+
+    /**
+     * Undoes the last answer or skip and shows that card again.
+     */
+    public async _undo(): Promise<void> {
+        if (this.reviewSequencer === null || !this.reviewSequencer.canUndo) return;
+        // A comment typed on the card now showing belongs to that card: write it first
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
+        if (await this.reviewSequencer.undo()) await this._showNextCard();
     }
 
     private _displayCurrentCardInfoNotice() {
