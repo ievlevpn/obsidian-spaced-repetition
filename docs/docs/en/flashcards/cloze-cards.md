@@ -68,7 +68,7 @@ These two cards are considered sibling cards. See [sibling cards](flashcards-ove
 Inside inline (`$...$`) or block (`$$...$$`) math, mark a cloze deletion with the `\cloze{answer}{hint}` macro.
 The other cloze delimiters are unsuitable inside math: `==` and `**` change the LaTeX rendering, and `{{...}}` collides with LaTeX's own use of braces. So inside `$...$` and `$$...$$` your cloze patterns are not looked for at all: braces there belong to LaTeX (e.g. `\frac{{a}}{b}` or `{{n} \choose {k}}` stay ordinary formulas), and `\cloze` is the only way to make a deletion.
 
-The hint is the second argument — leave it empty (`{}`) when you don't need one.
+The hint is the second argument, and it is optional: `\cloze{answer}` works too. A brace group written right after the answer is always read as the hint (as in TeX, spaces in between are skipped), so if a formula continues with a group, give the hint explicitly, even empty: `\cloze{f}{}{(x)}`.
 
 When you **read** a note, `\cloze{answer}{hint}` renders as just the `answer`, so the formula looks normal.
 When you **review**, the answer is hidden on the front (shown as `[hint]`, or `[…]` when no hint is given) and revealed on the back.

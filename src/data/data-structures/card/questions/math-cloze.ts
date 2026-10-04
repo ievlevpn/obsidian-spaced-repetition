@@ -1,6 +1,6 @@
-// The `\cloze[seq]{answer}{hint}` LaTeX macro. Unlike `{{...}}`, this token never occurs in
-// ordinary LaTeX, so there are no false positives, and a global MathJax macro (registered in
-// cloze-math-macro.ts) renders it as the answer in normal preview.
+// The `\cloze[seq]{answer}{hint}` LaTeX macro, with [seq] and {hint} optional. Unlike `{{...}}`,
+// this token never occurs in ordinary LaTeX, so there are no false positives, and a MathJax
+// command (registered in cloze-math-macro.ts) renders it as the answer in normal preview.
 //
 // For flashcard review, each macro is replaced by an opaque token that clozecraft parses with an
 // extra pattern (MATH_CLOZE_PATTERN), next to the user's own patterns. clozecraft therefore
@@ -127,7 +127,7 @@ function placeholder(cloze: MathCloze): string {
 }
 
 // Locate every `\cloze[seq]{answer}{hint}`, reading the arguments as balanced-brace groups. The
-// optional [seq] must be a sequence number or an a/h/s overlapping string.
+// optional [seq] must be a sequence number or an a/h/s overlapping string; {hint} is optional.
 function findMathClozes(text: string): MathCloze[] {
     const result: MathCloze[] = [];
     const cmd = "\\cloze";
@@ -141,7 +141,13 @@ function findMathClozes(text: string): MathCloze[] {
         }
         const seq = readSeqArgument(text, after);
         const answer = seq !== undefined && readBraceGroup(text, seq ? seq.end : after);
-        const hint = answer && readBraceGroup(text, answer.end);
+        // The hint is optional: a brace group right after the answer is the hint (as in TeX,
+        // spaces between are skipped); an opening brace that never closes is malformed.
+        const hint =
+            answer &&
+            (nextNonSpace(text, answer.end) === "{"
+                ? readBraceGroup(text, answer.end)
+                : { content: "", end: answer.end });
         if (answer && hint) {
             result.push({
                 start: i,
@@ -171,6 +177,13 @@ function readSeqArgument(
     const content = close === -1 ? "" : text.slice(p + 1, close).trim();
     if (!/^(\d+|[ash]+)$/.test(content)) return undefined;
     return { content, end: close + 1 };
+}
+
+// The first non-whitespace character at or after `pos` ("" at the end of the text).
+function nextNonSpace(text: string, pos: number): string {
+    let p = pos;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    return text[p] ?? "";
 }
 
 // From `pos` (skipping whitespace), read a `{ ... }` group with balanced braces, ignoring escaped

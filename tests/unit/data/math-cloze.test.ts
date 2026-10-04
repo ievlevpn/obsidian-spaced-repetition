@@ -85,9 +85,8 @@ describe("expanding \\cloze macros", () => {
         ]);
     });
 
-    test("a malformed \\cloze (missing second arg) is left alone", () => {
-        // No second {...} -> not a valid cloze -> no cards produced.
-        expect(expand("$\\cloze{a}$")).toEqual([]);
+    test("a \\cloze without an answer group is left alone", () => {
+        expect(expand("$\\cloze x$")).toEqual([]);
     });
 
     test("\\clozeXYZ (command continues with letters) is not a cloze", () => {
@@ -107,7 +106,8 @@ describe("tokenizeMathClozes / restoreMathClozes", () => {
         ["$\\cloze{a}{} + \\cloze[2]{b}{}$", "$a + b$"],
         ["$\\cloze[hsa]{\\frac{1}{2}}{half}$", "$\\frac{1}{2}$"],
         ["no macro here", "no macro here"],
-        ["$\\cloze{a}$", "$\\cloze{a}$"], // malformed: left untouched
+        ["$\\cloze{a}$", "$a$"], // the hint is optional
+        ["$\\cloze x$", "$\\cloze x$"], // malformed: left untouched
     ])("restoring the tokens of %s gives %s", (text, expected) => {
         const { text: tokenized, clozes } = tokenizeMathClozes(text);
         expect(restoreMathClozes(tokenized, clozes)).toBe(expected);
@@ -279,5 +279,31 @@ describe("braces inside math belong to LaTeX", () => {
         expect(cards).toHaveLength(2);
         expect(cards[0].front).toBe("${\\color{#2196f3}{[\\ldots]}} = y$ and z");
         expect(cards[1].front).toContain("$x^{{2}} = y$");
+    });
+});
+
+describe("the hint argument is optional", () => {
+    test("\\cloze{answer} without a hint", () => {
+        expect(expand("$\\cloze{a} + b$")).toEqual([
+            new CardFrontBack("${\\color{#2196f3}{[\\ldots]}} + b$", "${\\color{#2196f3}{a}} + b$"),
+        ]);
+    });
+
+    test("with a sequence number and no hint", () => {
+        const cards = expand("$\\cloze[2]{a} + \\cloze[1]{b}$");
+        expect(cards.map((c) => c.front)).toEqual([
+            "$a + {\\color{#2196f3}{[\\ldots]}}$",
+            "${\\color{#2196f3}{[\\ldots]}} + b$",
+        ]);
+    });
+
+    test("a brace group right after the answer is the hint, also after spaces", () => {
+        const [card] = expand("$\\cloze{a} {why} + b$");
+        expect(card.front).toBe("${\\color{#2196f3}{[\\text{why}]}} + b$");
+    });
+
+    test("anything else after the answer is part of the formula", () => {
+        const [card] = expand("$\\cloze{a}^2 + \\cloze{b}_{i}$");
+        expect(card.front).toBe("${\\color{#2196f3}{[\\ldots]}}^2 + b_{i}$");
     });
 });
