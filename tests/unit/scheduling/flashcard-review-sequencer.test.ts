@@ -1866,9 +1866,9 @@ describe("\\cloze{answer}{hint} math cloze cards (end-to-end)", () => {
         // Registered as one cloze card: front occludes the answer, back reveals it (both in $$).
         expect(c.cardSequencer.currentDeck.getRepItemCount(RepItemState.AnyItem, false)).toEqual(1);
         expect(c.reviewSequencer.currentCard.front).toBe(
-            "$$\n\\color{#2196f3}{[\\ldots]} = mc^2\n$$",
+            "$$\n{\\color{#2196f3}{[\\ldots]}} = mc^2\n$$",
         );
-        expect(c.reviewSequencer.currentCard.back).toBe("$$\n\\color{#2196f3}{E} = mc^2\n$$");
+        expect(c.reviewSequencer.currentCard.back).toBe("$$\n{\\color{#2196f3}{E}} = mc^2\n$$");
 
         await c.reviewSequencer.processReview(ReviewResponse.Easy);
         const out: string = c.file.content;

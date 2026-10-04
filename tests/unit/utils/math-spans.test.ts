@@ -1,4 +1,4 @@
-import { findMathSpans, isInsideMath, splitMath } from "src/utils/math-spans";
+import { findMathSpans, isInsideMath, maskMath, splitMath } from "src/utils/math-spans";
 
 const mathOf = (text: string) => findMathSpans(text).map((s) => text.slice(s.start, s.end));
 
@@ -25,6 +25,10 @@ describe("findMathSpans", () => {
     test("inline code is not math", () => {
         expect(mathOf("use `$x$` literally, but $y$")).toEqual(["$y$"]);
         expect(mathOf("``a ` $x$ ``")).toEqual([]);
+    });
+
+    test("an unclosed backtick does not hide the math after it", () => {
+        expect(mathOf("a lone ` backtick, then $x$")).toEqual(["$x$"]);
     });
 
     test("fenced code blocks are not math", () => {
@@ -54,6 +58,30 @@ describe("splitMath", () => {
     });
 });
 
+describe("maskMath", () => {
+    test("hides the math and restores it", () => {
+        const text = "a $\\frac{{x}}{y}$ b {{c}}";
+        const { masked, restore } = maskMath(text);
+        expect(masked).not.toContain("{{x}}");
+        expect(masked).toContain("{{c}}");
+        expect(restore(masked)).toBe(text);
+    });
+
+    test("text without math is unchanged", () => {
+        const { masked, restore } = maskMath("no math {{c}}");
+        expect(masked).toBe("no math {{c}}");
+        expect(restore("x")).toBe("x");
+    });
+
+    test("matches of `keep` stay visible inside math", () => {
+        const text = "$a KEEP1 b KEEP2$";
+        const { masked, restore } = maskMath(text, /KEEP\d/g);
+        expect(masked).toContain("KEEP1");
+        expect(masked).toContain("KEEP2");
+        expect(masked).not.toContain(" a ");
+        expect(restore(masked)).toBe(text);
+    });
+});
 describe("isInsideMath", () => {
     test("positions inside and outside a span", () => {
         const text = "a $x$ b";

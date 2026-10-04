@@ -1,102 +1,135 @@
-// The `\cloze{answer}{hint}` LaTeX macro. Unlike `{{...}}`, this token never occurs in ordinary
-// LaTeX, so there are no false positives, and a global MathJax macro (registered in
-// cloze-math-macro.ts) renders it as the answer in normal preview. Here we parse it for flashcard
-// review: each `\cloze` becomes one sibling card whose answer is occluded on the front and
-// revealed (highlighted) on the back. Other clozes in the same note show their answer plainly.
+// The `\cloze[seq]{answer}{hint}` LaTeX macro, with [seq] and {hint} optional. Unlike `{{...}}`,
+// this token never occurs in ordinary LaTeX, so there are no false positives, and a MathJax
+// command (registered in cloze-math-macro.ts) renders it as the answer in normal preview.
 //
-// The macro only counts inside math (`$...$` / `$$...$$`): outside math it is plain text, for
-// example in a note documenting the syntax.
-//
-// Returns bare { front, back } pairs (not CardFrontBack) so this stays a leaf module with no
-// dependency back on question-type.
+// For flashcard review, each macro is replaced by an opaque token that clozecraft parses with an
+// extra pattern (MATH_CLOZE_PATTERN), next to the user's own patterns. clozecraft therefore
+// decides which deletions are asked, shown or hidden on each card, exactly as for `{{...}}`:
+// - `\cloze{a}{h}`        one card per deletion (simple)
+// - `\cloze[2]{a}{h}`     a sequence number: deletions with the same number share a card
+// - `\cloze[hsa]{a}{h}`   generalized overlapping: a/h/s = ask/hide/show on card 1, 2, 3, ...
+// MathClozeFormatter then renders the tokens back as LaTeX, and restoreMathClozes puts the plain
+// answer back wherever clozecraft left a deletion unformatted.
+
+import { IClozeFormatter } from "clozecraft";
 
 import { findMathSpans, isInsideMath, splitMath } from "src/utils/math-spans";
 
 const CLOZE_COLOR = "#2196f3";
+const HIDDEN_COLOR = "gray";
 
-interface MathCloze {
+// Private-use characters: they never occur in notes and match none of the user's patterns.
+const OPEN = "";
+const CLOSE = "";
+const SEP = "";
+const KEY = "";
+
+/** The clozecraft pattern for math cloze tokens; list it before the user's patterns. */
+export const MATH_CLOZE_PATTERN = `${OPEN}[123${SEP}]answer[${SEP}hint]${CLOSE}`;
+
+/** Matches one math cloze token (global, for scanning). */
+export const MATH_CLOZE_TOKEN = new RegExp(`${OPEN}[^${CLOSE}]*${CLOSE}`, "g");
+
+export interface MathCloze {
     start: number; // index of the leading backslash
     end: number; // index just past the closing brace of the hint arg
+    seq: string | null; // the optional [...] argument: a sequence number or an a/h/s string
     answer: string;
     hint: string;
 }
 
 /**
- * Whether `text` contains at least one `\cloze{...}{...}` macro inside math.
+ * Whether `text` contains a `\cloze` macro. Deliberately lenient (the arguments are not checked),
+ * since the parser tests single lines and a macro's arguments may continue on the next one.
  *
- * @param text - The text to test (a whole card; math spans are located within it)
- * @returns True if a `\cloze{` macro is present inside `$...$` or `$$...$$`
+ * @param text - The text to test (a single line in the parser, or a whole card)
+ * @returns True if `\cloze{` or `\cloze[` is present inside math (outside math it is plain text)
  */
 export function containsMathCloze(text: string): boolean {
-    return /\\cloze\s*\{/.test(splitMath(text).mathOnly);
+    return /\\cloze\s*[[{]/.test(splitMath(text).mathOnly);
 }
 
 /**
- * Expand the `\cloze{answer}{hint}` macros in `text` into one flashcard per cloze.
- *
- * @param text - The card text, typically containing `$...$` / `$$...$$` math
- * @returns One `{ front, back }` per cloze; on each card the target cloze is occluded on the
- *     front and revealed (highlighted) on the back, while the other clozes show their answer
- */
-/**
- * Replace every `\cloze{answer}{hint}` with its bare `answer`.
- *
- * Used when expanding the *other* cloze syntax in the same block: a `{{...}}` card should show
- * the math clozes as ordinary formula text rather than as `\cloze` markup.
+ * Replace each `\cloze` macro with a token for MATH_CLOZE_PATTERN.
  *
  * @param text - The card text
- * @returns `text` with every `\cloze` macro collapsed to its answer
+ * @returns The tokenized text and the clozes, indexed by the key inside each token
  */
-export function stripMathClozes(text: string): string {
+export function tokenizeMathClozes(text: string): { text: string; clozes: MathCloze[] } {
     const clozes = findMathClozes(text);
-    if (clozes.length === 0) return text;
-    let out = "";
-    let prev = 0;
-    for (const cloze of clozes) {
-        out += text.slice(prev, cloze.start) + cloze.answer;
-        prev = cloze.end;
-    }
-    return out + text.slice(prev);
-}
-
-export function expandMathClozes(text: string): { front: string; back: string }[] {
-    const clozes = findMathClozes(text);
-    const cards: { front: string; back: string }[] = [];
-    for (let target = 0; target < clozes.length; target++) {
-        cards.push({
-            front: renderCard(text, clozes, target, false),
-            back: renderCard(text, clozes, target, true),
-        });
-    }
-    return cards;
-}
-
-// Rebuild the card text, replacing each `\cloze{...}{...}` with its front/back rendering.
-function renderCard(
-    text: string,
-    clozes: MathCloze[],
-    targetIndex: number,
-    isBack: boolean,
-): string {
     let out = "";
     let cursor = 0;
-    for (let k = 0; k < clozes.length; k++) {
-        const cloze = clozes[k];
-        out += text.slice(cursor, cloze.start);
-        out += renderCloze(cloze, k === targetIndex, isBack);
+    clozes.forEach((cloze, k) => {
+        const seq = cloze.seq === null ? "" : cloze.seq + SEP;
+        out += text.slice(cursor, cloze.start) + OPEN + seq + KEY + k + KEY + CLOSE;
         cursor = cloze.end;
+    });
+    return { text: out + text.slice(cursor), clozes };
+}
+
+/**
+ * Put the plain answer back for every math cloze that clozecraft left unformatted: deletions not
+ * asked on this card, and whole tokens of a type the note does not use (e.g. an unnumbered
+ * `\cloze` in a note with sequence numbers).
+ *
+ * @param text - A rendered card side
+ * @param clozes - The clozes returned by tokenizeMathClozes
+ * @returns The text with every leftover token or key replaced by its answer
+ */
+export function restoreMathClozes(text: string, clozes: MathCloze[]): string {
+    const answer = (k: string) => clozes[Number(k)].answer;
+    const token = new RegExp(`${OPEN}[^${CLOSE}]*?${KEY}(\\d+)${KEY}[^${CLOSE}]*${CLOSE}`, "g");
+    const key = new RegExp(`${KEY}(\\d+)${KEY}`, "g");
+    return text
+        .replace(token, (_, k: string) => answer(k))
+        .replace(key, (_, k: string) => answer(k));
+}
+
+/**
+ * Renders math cloze tokens as LaTeX and leaves every other deletion to the wrapped formatter.
+ * The color is scoped in braces: MathJax's `\color` is a switch, and unscoped it would recolor the
+ * rest of the formula.
+ */
+export class MathClozeFormatter implements IClozeFormatter {
+    private inner: IClozeFormatter;
+    private clozes: MathCloze[];
+
+    constructor(inner: IClozeFormatter, clozes: MathCloze[]) {
+        this.inner = inner;
+        this.clozes = clozes;
     }
-    return out + text.slice(cursor);
+
+    asking(answer?: string, hint?: string): string {
+        const cloze = this.lookup(answer);
+        if (!cloze) return this.inner.asking(answer, hint);
+        return `{\\color{${CLOZE_COLOR}}{${placeholder(cloze)}}}`;
+    }
+
+    showingAnswer(answer: string, hint?: string): string {
+        const cloze = this.lookup(answer);
+        if (!cloze) return this.inner.showingAnswer(answer, hint);
+        return `{\\color{${CLOZE_COLOR}}{${cloze.answer}}}`;
+    }
+
+    hiding(answer?: string, hint?: string): string {
+        const cloze = this.lookup(answer);
+        if (!cloze) return this.inner.hiding(answer, hint);
+        return `{\\color{${HIDDEN_COLOR}}{${placeholder(cloze)}}}`;
+    }
+
+    private lookup(answer?: string): MathCloze | null {
+        const m = answer?.match(new RegExp(`^${KEY}(\\d+)${KEY}$`));
+        return m ? this.clozes[Number(m[1])] : null;
+    }
 }
 
-function renderCloze(cloze: MathCloze, isTarget: boolean, isBack: boolean): string {
-    if (!isTarget) return cloze.answer; // shown normally on every card
-    if (isBack) return `\\color{${CLOZE_COLOR}}{${cloze.answer}}`; // revealed answer
-    const placeholder = cloze.hint.trim().length ? `[\\text{${cloze.hint.trim()}}]` : "[\\ldots]";
-    return `\\color{${CLOZE_COLOR}}{${placeholder}}`;
+function placeholder(cloze: MathCloze): string {
+    const hint = cloze.hint.trim();
+    return hint.length ? `[\\text{${hint}}]` : "[\\ldots]";
 }
 
-// Locate every `\cloze{answer}{hint}` inside math, reading both arguments as balanced-brace groups.
+// Locate every `\cloze[seq]{answer}{hint}`, reading the arguments as balanced-brace groups. The
+// optional [seq] must be a sequence number or an a/h/s overlapping string; {hint} is optional.
 function findMathClozes(text: string): MathCloze[] {
     const result: MathCloze[] = [];
     const spans = findMathSpans(text);
@@ -104,7 +137,7 @@ function findMathClozes(text: string): MathCloze[] {
     let i = text.indexOf(cmd);
     while (i !== -1) {
         const after = i + cmd.length;
-        // Outside math the macro is plain text.
+        // Outside math the macro is plain text (e.g. in a note documenting the syntax).
         if (!isInsideMath(spans, i)) {
             i = text.indexOf(cmd, after);
             continue;
@@ -114,16 +147,51 @@ function findMathClozes(text: string): MathCloze[] {
             i = text.indexOf(cmd, after);
             continue;
         }
-        const answer = readBraceGroup(text, after);
-        const hint = answer && readBraceGroup(text, answer.end);
+        const seq = readSeqArgument(text, after);
+        const answer = seq !== undefined && readBraceGroup(text, seq ? seq.end : after);
+        // The hint is optional: a brace group right after the answer is the hint (as in TeX,
+        // spaces between are skipped); an opening brace that never closes is malformed.
+        const hint =
+            answer &&
+            (nextNonSpace(text, answer.end) === "{"
+                ? readBraceGroup(text, answer.end)
+                : { content: "", end: answer.end });
         if (answer && hint) {
-            result.push({ start: i, end: hint.end, answer: answer.content, hint: hint.content });
+            result.push({
+                start: i,
+                end: hint.end,
+                seq: seq ? seq.content : null,
+                answer: answer.content,
+                hint: hint.content,
+            });
             i = text.indexOf(cmd, hint.end);
         } else {
             i = text.indexOf(cmd, after);
         }
     }
     return result;
+}
+
+// From `pos` (skipping whitespace), read an optional `[seq]` argument. Returns null when there is
+// none, the argument when it is valid, and undefined when it is present but malformed.
+function readSeqArgument(
+    text: string,
+    pos: number,
+): { content: string; end: number } | null | undefined {
+    let p = pos;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    if (text[p] !== "[") return null;
+    const close = text.indexOf("]", p);
+    const content = close === -1 ? "" : text.slice(p + 1, close).trim();
+    if (!/^(\d+|[ash]+)$/.test(content)) return undefined;
+    return { content, end: close + 1 };
+}
+
+// The first non-whitespace character at or after `pos` ("" at the end of the text).
+function nextNonSpace(text: string, pos: number): string {
+    let p = pos;
+    while (p < text.length && /\s/.test(text[p])) p++;
+    return text[p] ?? "";
 }
 
 // From `pos` (skipping whitespace), read a `{ ... }` group with balanced braces, ignoring escaped

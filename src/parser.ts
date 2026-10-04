@@ -136,7 +136,7 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
         lineStarts.push(offset);
     }
     const isClozeLine = (i: number): boolean =>
-        clozecrafter.isClozeNote(textOnlyLines[i]) || /\\cloze\s*\{/.test(mathOnlyLines[i]);
+        clozecrafter.isClozeNote(textOnlyLines[i]) || /\\cloze\s*[[{]/.test(mathOnlyLines[i]);
     // A line that is part of a multi-line `$$` block can never be a card on its own.
     const crossesMathBoundary = (i: number): boolean => {
         const start: number = lineStarts[i],

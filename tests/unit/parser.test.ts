@@ -940,3 +940,27 @@ describe("Parser debug messages", () => {
         logSpy.mockRestore();
     });
 });
+
+describe("braces inside math belong to LaTeX", () => {
+    const options: ParserOptions = {
+        ...parserOptions,
+        clozePatterns: ["{{[123;;]answer[;;hint]}}"],
+    };
+
+    test("{{...}} inside inline or display math does not start a cloze card", () => {
+        expect(parseT("$\\frac{{a}}{b}$ and no cloze", options)).toEqual([]);
+        expect(parseT("$$\n{{n} \\choose {k}}\n$$", options)).toEqual([]);
+    });
+
+    test("{{...}} outside math next to math still does", () => {
+        expect(parseT("$x^2$ is {{a square}}", options)).toEqual([
+            [CardType.Cloze, "$x^2$ is {{a square}}", 0, 0],
+        ]);
+    });
+
+    test("\\cloze inside a multi-line $$ block still starts a card", () => {
+        expect(parseT("$$\nx = \\cloze{a}{}\n$$", options)).toEqual([
+            [CardType.Cloze, "$$\nx = \\cloze{a}{}\n$$", 0, 2],
+        ]);
+    });
+});

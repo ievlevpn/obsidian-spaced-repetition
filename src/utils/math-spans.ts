@@ -149,7 +149,7 @@ export function splitMath(
 }
 
 /**
- * Replace every math span with an opaque placeholder, so text-level cloze patterns (`{{...}}`)
+ * Replace the math in `text` with opaque placeholders, so text-level cloze patterns (`{{...}}`)
  * cannot match LaTeX braces. `restore` puts the original math back into any string derived from
  * the masked text (e.g. a rendered card front).
  *
@@ -157,21 +157,37 @@ export function splitMath(
  * contain no characters a cloze pattern could match.
  *
  * @param text - The text to mask
+ * @param keep - Matches inside math that stay visible (e.g. math cloze tokens); must be global
  * @returns `{ masked, restore }`
  */
-export function maskMath(text: string): { masked: string; restore: (s: string) => string } {
+export function maskMath(
+    text: string,
+    keep?: RegExp,
+): { masked: string; restore: (s: string) => string } {
     const spans = findMathSpans(text);
     if (spans.length === 0) return { masked: text, restore: (s) => s };
     const originals: string[] = [];
+    const hide = (s: string) => {
+        if (s.length === 0) return "";
+        originals.push(s);
+        return `\uE000${originals.length - 1}\uE001`;
+    };
     let masked = "";
     let cursor = 0;
     for (const span of spans) {
-        masked += text.slice(cursor, span.start) + `${originals.length}`;
-        originals.push(text.slice(span.start, span.end));
+        masked += text.slice(cursor, span.start);
+        const math = text.slice(span.start, span.end);
+        let last = 0;
+        for (const m of keep ? math.matchAll(keep) : []) {
+            masked += hide(math.slice(last, m.index)) + m[0];
+            last = m.index + m[0].length;
+        }
+        masked += hide(math.slice(last));
         cursor = span.end;
     }
     masked += text.slice(cursor);
-    const restore = (s: string) => s.replace(/(\d+)/g, (_, k: string) => originals[Number(k)]);
+    const restore = (s: string) =>
+        s.replace(/\uE000(\d+)\uE001/g, (_, k: string) => originals[Number(k)]);
     return { masked, restore };
 }
 
