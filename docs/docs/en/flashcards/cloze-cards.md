@@ -103,19 +103,36 @@ Generates two sibling cards, with the following fronts:
 
 The answer may contain braces, fractions, roots, and other nested LaTeX — for example `\cloze{\frac{-b \pm \sqrt{b^2 - 4ac}}{2a}}{}` — and is parsed correctly.
 
+### Sequence numbers and overlapping in math
+
+Like the other cloze syntaxes, `\cloze` supports [Classic Clozes](#classic-clozes) and [Generalized Cloze Overlapping](#generalized-cloze-overlapping), through an optional first argument in square brackets, as in LaTeX:
+
+- `\cloze[1]{answer}{hint}`: a sequence number. Deletions with the same number are asked on the same card, and cards follow the numbers.
+- `\cloze[ash]{answer}{hint}`: an overlapping string. The i-th letter says what the deletion does on card i: `a` ask, `h` hide, `s` show.
+
+For instance:
+
+```
+$$
+\cloze[1]{(a+b)^2}{} = \cloze[2]{a^2 + 2ab + b^2}{} \quad \text{and} \quad \cloze[1]{(a-b)^2}{} = a^2 - 2ab + b^2
+$$
+```
+
+asks both squares on card 1 and the expansion on card 2. Without the brackets, `\cloze{answer}{hint}` works as before: one card per deletion.
+
 !!! note
 
     `\cloze` works inside math regardless of the cloze patterns configured in your settings. It does not need to be added to [Custom Cloze Patterns](#custom-cloze-patterns).
 
 !!! note
 
-    A note may mix `\cloze` with the other cloze syntaxes. Each deletion becomes its own card, and on every card the deletions from the *other* syntax are shown as their plain answer:
+    A note may mix `\cloze` with the other cloze syntaxes; all its deletions are expanded together, following the same rules. Without sequence numbers each deletion becomes its own card (the `\cloze` ones first):
 
     ```
     $E = \cloze{mc^2}{}$ was published in ==1905==
     ```
 
-    gives two cards — one hiding `mc^2`, one hiding `1905`.
+    gives two cards — one hiding `mc^2`, one hiding `1905`. Sequence numbers are shared between the syntaxes, so `\cloze[1]{mc^2}{}` and `==1;;1905==` are asked on the same card.
 
 !!! warning
 
