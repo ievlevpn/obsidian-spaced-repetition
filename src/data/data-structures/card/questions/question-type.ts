@@ -2,12 +2,14 @@ import { ClozeCrafter, IClozeFormatter } from "clozecraft";
 
 import {
     MATH_CLOZE_PATTERN,
+    MATH_CLOZE_TOKEN,
     MathClozeFormatter,
     restoreMathClozes,
     tokenizeMathClozes,
 } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
+import { maskMath } from "src/utils/math-spans";
 import { findLineIndexOfSearchStringIgnoringWs } from "src/utils/strings";
 
 export class CardFrontBack {
@@ -105,7 +107,12 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
         // card per deletion, or grouped by sequence number, or by overlapping strings, with the
         // same rules for both syntaxes. The math pattern goes first, so in a note of simple clozes
         // the math deletions come first, then the text ones.
-        const { text, clozes } = tokenizeMathClozes(questionText);
+        //
+        // Inside math, braces belong to LaTeX: the rest of each formula is masked (only the math
+        // cloze tokens stay visible), so the user's patterns cannot match there, and is put back
+        // into every rendered side.
+        const { text: tokenized, clozes } = tokenizeMathClozes(questionText);
+        const { masked: text, restore: restoreMath } = maskMath(tokenized, MATH_CLOZE_TOKEN);
         const patterns: string[] =
             clozes.length > 0
                 ? [MATH_CLOZE_PATTERN, ...settings.clozePatterns]
@@ -122,8 +129,9 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
         if (clozeNote === null) return result;
 
         for (let i = 0; i < clozeNote.numCards; i++) {
-            const front = restoreMathClozes(clozeNote.getCardFront(i, clozeFormatter), clozes);
-            const back = restoreMathClozes(clozeNote.getCardBack(i, clozeFormatter), clozes);
+            const render = (side: string) => restoreMath(restoreMathClozes(side, clozes));
+            const front = render(clozeNote.getCardFront(i, clozeFormatter));
+            const back = render(clozeNote.getCardBack(i, clozeFormatter));
             result.push(new CardFrontBack(front, back));
         }
 

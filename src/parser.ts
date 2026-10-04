@@ -3,6 +3,7 @@ import { ClozeCrafter } from "clozecraft";
 import { SR_METADATA_CALLOUT } from "src/data/constants";
 import { containsMathCloze } from "src/data/data-structures/card/questions/math-cloze";
 import { CardType } from "src/data/data-structures/card/questions/question";
+import { splitMath } from "src/utils/math-spans";
 
 export let debugParser = false;
 
@@ -100,7 +101,10 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
         lastLineNo: number;
 
     const clozecrafter = new ClozeCrafter(options.clozePatterns);
-    const lines: string[] = text.replaceAll("\r\n", "\n").split("\n");
+    const normalized: string = text.replaceAll("\r\n", "\n");
+    const lines: string[] = normalized.split("\n");
+    // Inside math, braces belong to LaTeX: the cloze patterns are only looked for outside it
+    const textOnlyLines: string[] = splitMath(normalized).textOnly.split("\n");
     for (let i = 0; i < lines.length; i++) {
         const currentLine = lines[i],
             currentTrimmed = lines[i].trim();
@@ -199,9 +203,9 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             i++;
         } else if (
             cardType === null &&
-            (clozecrafter.isClozeNote(currentLine) || containsMathCloze(currentLine))
+            (clozecrafter.isClozeNote(textOnlyLines[i]) || containsMathCloze(currentLine))
         ) {
-            // Pick up cloze cards (clozecraft patterns, or the \cloze{answer}{hint} LaTeX macro)
+            // Pick up cloze cards (clozecraft patterns outside math, or the \cloze LaTeX macro)
             cardType = CardType.Cloze;
         }
     }

@@ -66,7 +66,7 @@ These two cards are considered sibling cards. See [sibling cards](flashcards-ove
 ## Clozes in Math (LaTeX)
 
 Inside inline (`$...$`) or block (`$$...$$`) math, mark a cloze deletion with the `\cloze{answer}{hint}` macro.
-The other cloze delimiters are unsuitable inside math: `==` and `**` change the LaTeX rendering, and `{{...}}` collides with LaTeX's own use of braces.
+The other cloze delimiters are unsuitable inside math: `==` and `**` change the LaTeX rendering, and `{{...}}` collides with LaTeX's own use of braces. So inside `$...$` and `$$...$$` your cloze patterns are not looked for at all: braces there belong to LaTeX (e.g. `\frac{{a}}{b}` or `{{n} \choose {k}}` stay ordinary formulas), and `\cloze` is the only way to make a deletion.
 
 The hint is the second argument — leave it empty (`{}`) when you don't need one.
 

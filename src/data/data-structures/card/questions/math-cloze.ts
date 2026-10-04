@@ -25,6 +25,9 @@ const KEY = "";
 /** The clozecraft pattern for math cloze tokens; list it before the user's patterns. */
 export const MATH_CLOZE_PATTERN = `${OPEN}[123${SEP}]answer[${SEP}hint]${CLOSE}`;
 
+/** Matches one math cloze token (global, for scanning). */
+export const MATH_CLOZE_TOKEN = new RegExp(`${OPEN}[^${CLOSE}]*${CLOSE}`, "g");
+
 export interface MathCloze {
     start: number; // index of the leading backslash
     end: number; // index just past the closing brace of the hint arg
