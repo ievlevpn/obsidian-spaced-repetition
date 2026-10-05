@@ -68,6 +68,26 @@
     font-size: var(--font-ui-smaller);
 }
 
+.sr-card-comment-save {
+    margin-left: auto;
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--text-normal);
+        text-decoration: underline;
+    }
+
+    &.sr-is-hidden {
+        display: none;
+    }
+}
+
+.sr-card-comment-save + .sr-card-comment-toggle:not(.sr-is-hidden) {
+    margin-left: 0;
+}
+
 .sr-card-comment-toggle {
     margin-left: auto;
     color: var(--text-faint);
@@ -165,5 +185,27 @@
 
 .sr-card-comment-editor .cm-tooltip::-webkit-scrollbar,
 .sr-card-comment-editor .cm-tooltip *::-webkit-scrollbar {
+    display: none;
+}
+
+/* "show N earlier notes" above the past notes, only when some are folded away */
+.sr-card-comment-more {
+    align-self: flex-start;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--text-muted);
+        text-decoration: underline;
+    }
+
+    &.sr-is-hidden {
+        display: none;
+    }
+}
+
+.sr-card-comment-entry.sr-is-hidden {
     display: none;
 }
