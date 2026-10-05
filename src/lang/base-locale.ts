@@ -199,6 +199,10 @@ export interface IBaseLocale {
     SWIPE_TO_SKIP: string;
     SWIPE_TO_SKIP_DESC: string;
     SWIPE_RELEASE_TO_SKIP: string;
+    SWIPE_BACK: string;
+    SWIPE_RELEASE_TO_GO_BACK: string;
+    SWIPE_TO_UNDO: string;
+    SWIPE_TO_UNDO_DESC: string;
     STATUS_BAR_SETTINGS: string;
     SHOW_STATUS_BAR: string;
     SHOW_STATUS_BAR_DESC: string;

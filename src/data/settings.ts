@@ -67,6 +67,8 @@ export interface SRSettings {
     openViewInNewTabMobile: boolean;
     // Mobile: swipe left from the right edge of the screen to skip the card
     mobileSwipeToSkip: boolean;
+    // Mobile: swipe right from the left edge to go back to the previous card (undo)
+    mobileSwipeToUndo: boolean;
     showDeleteButtonInCardView: boolean;
     showDeleteButtonInFileMenu: boolean;
     openViewInNewTab: boolean;
@@ -161,6 +163,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     openViewInNewTab: false,
     openViewInNewTabMobile: false,
     mobileSwipeToSkip: true,
+    mobileSwipeToUndo: true,
     useCustomHotkeys: false,
     useCalloutsForSchedulingComments: false,
 

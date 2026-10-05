@@ -1,10 +1,12 @@
 /*
- * Swipe-to-skip feedback. The host (the card's scroll wrapper) holds the content and the
- * indicator, clips the content while it slides, and carries the swipe position as variables:
- *   --sr-swipe-dx        horizontal offset of the finger (<= 0)
+ * Edge-swipe feedback (right edge: skip, left edge: back). The host (the card's scroll wrapper)
+ * holds the content and one indicator per edge, clips the content while it slides, and carries
+ * the swipe position as variables:
+ *   --sr-swipe-dx        horizontal offset of the finger (<= 0 from the right, >= 0 from the left)
  *   --sr-swipe-progress  0..1, how close the swipe is to committing
  * Phases: .sr-swipe-dragging (follows the finger), .sr-swipe-out (slides away, 150ms),
- * .sr-swipe-back (springs back, 200ms). Durations match swipe-feedback.tsx.
+ * .sr-swipe-back (springs back, 200ms); .sr-swipe-side-left/right says which edge is swiped.
+ * Durations match swipe-feedback.tsx.
  */
 .sr-swipe-host {
     --sr-swipe-dx: 0px;
@@ -26,20 +28,31 @@
     }
 
     &.sr-swipe-out > .sr-content {
-        transform: translateX(-100%);
         opacity: 0;
         transition:
             transform 150ms ease-in,
             opacity 150ms ease-in;
     }
+
+    &.sr-swipe-out.sr-swipe-side-right > .sr-content {
+        transform: translateX(-100%);
+    }
+
+    &.sr-swipe-out.sr-swipe-side-left > .sr-content {
+        transform: translateX(100%);
+    }
+}
+
+/* Mobile: vertical scrolling stays the browser's, horizontal swipes are ours, so iOS cannot take
+   an edge swipe over (and cancel it) when the card's content starts to scroll */
+.is-mobile .sr-card-container {
+    touch-action: pan-y pinch-zoom;
 }
 
 .sr-swipe-indicator {
     position: absolute;
     top: 50%;
-    right: var(--size-4-2);
-    transform: translate(calc((1 - var(--sr-swipe-progress)) * 100%), -50%);
-    opacity: var(--sr-swipe-progress);
+    opacity: 0;
     pointer-events: none;
     display: flex;
     flex-direction: column;
@@ -55,6 +68,16 @@
         background-color 120ms ease-out,
         color 120ms ease-out;
 
+    &.is-right {
+        right: var(--size-4-2);
+        transform: translate(calc((1 - var(--sr-swipe-progress)) * 100%), -50%);
+    }
+
+    &.is-left {
+        left: var(--size-4-2);
+        transform: translate(calc((var(--sr-swipe-progress) - 1) * 100%), -50%);
+    }
+
     & .sr-swipe-indicator-icon {
         display: flex;
     }
@@ -63,10 +86,16 @@
         background-color: var(--interactive-accent);
         color: var(--text-on-accent);
     }
+}
 
-    .sr-swipe-out > &,
-    .sr-swipe-back > & {
-        opacity: 0;
-        transition: opacity 150ms ease-out;
-    }
+/* Only the indicator of the edge being swiped shows, fading in with the swipe */
+.sr-swipe-side-right.sr-swipe-dragging > .sr-swipe-indicator.is-right,
+.sr-swipe-side-left.sr-swipe-dragging > .sr-swipe-indicator.is-left {
+    opacity: var(--sr-swipe-progress);
+}
+
+.sr-swipe-out > .sr-swipe-indicator,
+.sr-swipe-back > .sr-swipe-indicator {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
 }
