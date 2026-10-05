@@ -61,3 +61,18 @@
         }
     }
 }
+
+/* Quiet "new" / "seen" label at the top right of the card; floated, so text flows around it */
+.sr-card-container .sr-content .sr-card-status {
+    float: right;
+    margin: 0 0 var(--size-2-2) var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+    line-height: var(--line-height-tight);
+    color: var(--text-faint);
+    user-select: none;
+
+    &.is-new {
+        color: var(--text-accent);
+        opacity: 0.75;
+    }
+}

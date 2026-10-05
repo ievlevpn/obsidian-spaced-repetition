@@ -15,6 +15,10 @@ export interface IBaseLocale {
     BACK: string;
     SKIP: string;
     UNDO: string;
+    CARD_STATUS_NEW: string;
+    CARD_STATUS_NEW_HINT: string;
+    CARD_STATUS_SEEN: string;
+    CARD_STATUS_SEEN_HINT: string;
     CARD_NOTE_PLACEHOLDER: string;
     CARD_NOTE_EDIT: string;
     CARD_NOTE_EDIT_LINK: string;
