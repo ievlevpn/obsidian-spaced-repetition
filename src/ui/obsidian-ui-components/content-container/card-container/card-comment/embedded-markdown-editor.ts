@@ -93,6 +93,7 @@ export interface EmbeddedMarkdownEditor {
     getValue(): string;
     setValue(value: string): void;
     setFilePath(path: string | null): void;
+    focus(): void;
     destroy(): void;
 }
 
@@ -196,6 +197,7 @@ export function createEmbeddedMarkdownEditor(
         setFilePath: (path: string | null) => {
             filePath = path;
         },
+        focus: () => instance.editor.focus(),
         destroy: () => {
             if (workspace.activeEditor === owner) workspace.activeEditor = previousActiveEditor;
             parent.removeChild(instance);

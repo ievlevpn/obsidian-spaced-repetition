@@ -70,6 +70,26 @@ export function upsertFootnoteDefinition(
     return usedCrlf ? result.replaceAll("\n", "\r\n") : result;
 }
 
+/**
+ * Removes the definition of `label` from the note, with the blank line that separated it from
+ * the text above. Returns the text unchanged when there is no such definition.
+ */
+export function removeFootnoteDefinition(noteText: string, label: string): string {
+    const usedCrlf: boolean = noteText.includes("\r\n");
+    const lines = noteText.replaceAll("\r\n", "\n").split("\n");
+    const range = findDefinitionRange(lines, label);
+    if (!range) return noteText;
+    const end: number = range[1];
+    let start: number = range[0];
+    while (start > 0 && lines[start - 1].trim() === "") start--;
+    // Keep one blank line if text follows, so the paragraphs around stay apart
+    if (start > 0 && end < lines.length && lines[end].trim() !== "")
+        lines.splice(start, end - start, "");
+    else lines.splice(start, end - start);
+    const result = lines.join("\n");
+    return usedCrlf ? result.replaceAll("\n", "\r\n") : result;
+}
+
 /** Every label in the note that belongs to this plugin. */
 export function collectCardCommentLabels(noteText: string): Set<string> {
     const labels = new Set<string>();

@@ -16,6 +16,7 @@ import { Note } from "src/note/note";
 import { ParsedQuestionInfo } from "src/parser";
 import {
     appendCardCommentEntry,
+    editCardCommentEntry,
     extractCardCommentRef,
     formatCardCommentRef,
     generateCardCommentLabel,
@@ -259,6 +260,8 @@ export class Question {
     // Staged comment text/date, set by stageCardComment() and consumed by resolveCardComment()
     private pendingCardCommentText: string | null = null;
     private pendingCardCommentDate: string | null = null;
+    // Set when the staged text replaces an existing entry instead of adding one
+    private pendingCardCommentEditIndex: number | null = null;
 
     // Whether the most recent updateQuestionWithinNoteText call located this question's
     // original text. False means the note changed under us and nothing should be written.
@@ -317,6 +320,18 @@ export class Question {
     stageCardComment(text: string, date: string): void {
         this.pendingCardCommentText = text;
         this.pendingCardCommentDate = date;
+        this.pendingCardCommentEditIndex = null;
+        this.hasChanged = true;
+    }
+
+    /**
+     * Records a new text for existing entry `index`, written by the next write of this question.
+     * Blank text deletes the entry; deleting the last one removes the footnote and reference.
+     */
+    stageCardCommentEdit(index: number, text: string): void {
+        this.pendingCardCommentText = text;
+        this.pendingCardCommentDate = null;
+        this.pendingCardCommentEditIndex = index;
         this.hasChanged = true;
     }
 
@@ -324,6 +339,7 @@ export class Question {
     discardPendingCardComment(): void {
         this.pendingCardCommentText = null;
         this.pendingCardCommentDate = null;
+        this.pendingCardCommentEditIndex = null;
     }
 
     /**
@@ -348,8 +364,27 @@ export class Question {
     resolveCardComment(noteText: string): string | null {
         const text: string | null = this.pendingCardCommentText;
         const date: string | null = this.pendingCardCommentDate;
+        const editIndex: number | null = this.pendingCardCommentEditIndex;
         this.pendingCardCommentText = null;
         this.pendingCardCommentDate = null;
+        this.pendingCardCommentEditIndex = null;
+
+        // Editing an existing entry. "" means the last entry was deleted: the reference goes,
+        // and the data store removes the footnote.
+        if (editIndex !== null && text !== null) {
+            const label: string | null = this.questionText.cardCommentRef;
+            if (!label) return null;
+            const current: string | null =
+                this.cardCommentDefinition ?? findFootnoteDefinition(noteText, label);
+            const definition: string | null = editCardCommentEntry(current, label, editIndex, text);
+            if (definition === current) return null;
+            if (definition === "") {
+                this.questionText.cardCommentRef = null;
+                this.hasChanged = true;
+            }
+            return definition;
+        }
+
         if (!text || text.trim().length === 0 || !date) return null;
 
         let label: string | null = this.questionText.cardCommentRef;

@@ -6,7 +6,7 @@ import { Question } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { CommentParser } from "src/utils/comment-parser";
-import { upsertFootnoteDefinition } from "src/utils/note-footnotes";
+import { removeFootnoteDefinition, upsertFootnoteDefinition } from "src/utils/note-footnotes";
 import { MultiLineTextFinder } from "src/utils/strings";
 
 export class NotesDataStore implements IDataStore {
@@ -135,6 +135,11 @@ export class NotesDataStore implements IDataStore {
         if (definition && label) {
             finalText = upsertFootnoteDefinition(newText, label, definition);
             question.cardCommentDefinition = definition;
+        } else if (definition === "" && refBeforeResolve) {
+            // The last comment entry was deleted: its footnote goes too (the reference already
+            // went with the card rewrite above)
+            finalText = removeFootnoteDefinition(newText, refBeforeResolve);
+            question.cardCommentDefinition = null;
         }
 
         await question.note.file.write(finalText);

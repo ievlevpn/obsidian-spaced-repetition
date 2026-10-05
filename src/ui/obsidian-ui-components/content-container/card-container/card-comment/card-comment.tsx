@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment.css";
-import { App, Platform } from "obsidian";
+import { App, Platform, setIcon } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
@@ -7,10 +7,17 @@ import {
     createEmbeddedMarkdownEditor,
     EmbeddedMarkdownEditor,
 } from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/embedded-markdown-editor";
-import { parseCardCommentDefinition } from "src/utils/card-comment";
+import { CardCommentEntry, parseCardCommentDefinition } from "src/utils/card-comment";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
 import { TextDirection } from "src/utils/strings";
+
+/** What the box holds when it is harvested: new text, or a new text for an existing entry. */
+export interface CardCommentInput {
+    text: string;
+    // Index of the entry being edited, or null for a new entry
+    editIndex: number | null;
+}
 
 export default class CardCommentComponent {
     private app: App;
@@ -21,6 +28,10 @@ export default class CardCommentComponent {
     // textarea when Obsidian's editor class cannot be obtained
     private editor: EmbeddedMarkdownEditor | null = null;
     private textarea: HTMLTextAreaElement | null = null;
+    // Editing a past entry: which one, and the quiet "Editing note from … · Cancel" line
+    private entries: CardCommentEntry[] = [];
+    private editIndex: number | null = null;
+    private editingLine: HTMLDivElement;
 
     public constructor(parentEl: HTMLElement, app: App, plugin: SRPlugin) {
         this.app = app;
@@ -31,6 +42,9 @@ export default class CardCommentComponent {
 
         this.pastEntries = this.container.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
+
+        this.editingLine = this.container.createDiv();
+        this.editingLine.addClasses(["sr-card-comment-editing", "sr-is-hidden"]);
 
         this.editor = createEmbeddedMarkdownEditor(
             app,
@@ -85,25 +99,36 @@ export default class CardCommentComponent {
      * and on a phone it would raise the keyboard over the rating buttons on every card.
      */
     public async show(cardCommentDefinition: string | null, filePath: string): Promise<void> {
+        this.stopEditing();
         this.setInput("");
         this.editor?.setFilePath(filePath);
         this.pastEntries.empty();
+        this.entries = cardCommentDefinition
+            ? parseCardCommentDefinition(cardCommentDefinition)
+            : [];
 
-        if (cardCommentDefinition) {
-            const entries = parseCardCommentDefinition(cardCommentDefinition);
-            const wrapper = new RenderMarkdownWrapper(this.app, this.plugin, filePath);
-            for (const entry of entries) {
-                const row = this.pastEntries.createDiv();
-                row.addClass("sr-card-comment-entry");
-                if (entry.date) {
-                    const dateEl = row.createSpan();
-                    dateEl.addClass("sr-card-comment-date");
-                    dateEl.setText(entry.date);
-                }
-                const body = row.createDiv();
-                body.addClass("sr-card-comment-text");
-                await wrapper.renderMarkdownWrapper(entry.text, body, TextDirection.Unspecified);
+        const wrapper = new RenderMarkdownWrapper(this.app, this.plugin, filePath);
+        for (const [index, entry] of this.entries.entries()) {
+            const row = this.pastEntries.createDiv();
+            row.addClass("sr-card-comment-entry");
+            if (entry.date) {
+                const dateEl = row.createSpan();
+                dateEl.addClass("sr-card-comment-date");
+                dateEl.setText(entry.date);
             }
+            const body = row.createDiv();
+            body.addClass("sr-card-comment-text");
+            await wrapper.renderMarkdownWrapper(entry.text, body, TextDirection.Unspecified);
+
+            // A quiet pencil: loads the entry into the box below; saved like a new comment
+            const editButton = row.createEl("button");
+            editButton.addClass("sr-card-comment-edit");
+            editButton.ariaLabel = t("CARD_NOTE_EDIT");
+            setIcon(editButton, "pencil");
+            editButton.addEventListener("click", (e: MouseEvent) => {
+                e.preventDefault();
+                this.startEditing(index);
+            });
         }
 
         this.container.removeClass("sr-is-hidden");
@@ -111,15 +136,53 @@ export default class CardCommentComponent {
 
     public hide(): void {
         this.container.addClass("sr-is-hidden");
+        this.stopEditing();
         this.setInput("");
         this.pastEntries.empty();
     }
 
-    /** Returns the typed text and clears the box, so it is harvested exactly once. */
-    public takeText(): string {
-        const text: string = this.getInput();
+    /**
+     * Returns the box's content and clears it, so it is harvested exactly once: a new comment,
+     * or the new text of the entry being edited (blank deletes that entry).
+     */
+    public takeInput(): CardCommentInput {
+        const input: CardCommentInput = { text: this.getInput(), editIndex: this.editIndex };
+        this.stopEditing();
         this.setInput("");
-        return text;
+        return input;
+    }
+
+    private startEditing(index: number): void {
+        const entry: CardCommentEntry | undefined = this.entries[index];
+        if (!entry) return;
+        this.editIndex = index;
+        this.setInput(entry.text);
+
+        this.editingLine.empty();
+        this.editingLine.createSpan({
+            text: entry.date
+                ? `${t("CARD_NOTE_EDITING")} ${entry.date}`
+                : t("CARD_NOTE_EDITING_UNDATED"),
+        });
+        this.editingLine.createSpan({ text: " · " });
+        const cancel = this.editingLine.createEl("a", { text: t("CANCEL") });
+        cancel.addEventListener("click", (e: MouseEvent) => {
+            e.preventDefault();
+            this.stopEditing();
+            this.setInput("");
+        });
+        this.editingLine.removeClass("sr-is-hidden");
+        this.pastEntries.children[index]?.addClass("is-being-edited");
+
+        if (this.editor) this.editor.focus();
+        else this.textarea?.focus();
+    }
+
+    private stopEditing(): void {
+        if (this.editIndex !== null)
+            this.pastEntries.children[this.editIndex]?.removeClass("is-being-edited");
+        this.editIndex = null;
+        this.editingLine.addClass("sr-is-hidden");
     }
 
     private _autoGrow(): void {

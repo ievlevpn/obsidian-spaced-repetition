@@ -26,6 +26,59 @@
 .sr-card-comment-entry {
     display: flex;
     gap: var(--size-4-1);
+    align-items: flex-start;
+
+    &.is-being-edited {
+        opacity: 0.5;
+    }
+}
+
+/* A quiet pencil: invisible until the entry is hovered on desktop, faint on touch screens */
+.sr-card-comment-edit {
+    flex-shrink: 0;
+    margin-left: auto;
+    padding: 0 var(--size-2-1);
+    height: auto;
+    background: none;
+    box-shadow: none;
+    color: var(--text-faint);
+    opacity: 0;
+    cursor: pointer;
+    transition: opacity 120ms ease-out;
+
+    & svg {
+        width: var(--icon-xs);
+        height: var(--icon-xs);
+    }
+
+    &:hover,
+    &:focus-visible {
+        color: var(--text-muted);
+        background: none;
+    }
+}
+
+.sr-card-comment-entry:hover .sr-card-comment-edit,
+.sr-card-comment-edit:focus-visible {
+    opacity: 1;
+}
+
+.is-mobile .sr-card-comment-edit {
+    opacity: 0.6;
+}
+
+.sr-card-comment-editing {
+    font-size: var(--font-ui-smaller);
+    color: var(--text-faint);
+
+    &.sr-is-hidden {
+        display: none;
+    }
+
+    & a {
+        color: var(--text-muted);
+        cursor: pointer;
+    }
 }
 
 .sr-card-comment-date {
