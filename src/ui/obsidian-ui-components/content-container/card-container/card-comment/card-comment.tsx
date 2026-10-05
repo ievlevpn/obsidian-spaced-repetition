@@ -3,6 +3,10 @@ import { App, Platform } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
+import {
+    createEmbeddedMarkdownEditor,
+    EmbeddedMarkdownEditor,
+} from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/embedded-markdown-editor";
 import { parseCardCommentDefinition } from "src/utils/card-comment";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
@@ -13,7 +17,10 @@ export default class CardCommentComponent {
     private plugin: SRPlugin;
     private container: HTMLDivElement;
     private pastEntries: HTMLDivElement;
-    private textarea: HTMLTextAreaElement;
+    // An embedded Obsidian editor (live preview, editor plugins such as latex-suite), or a plain
+    // textarea when Obsidian's editor class cannot be obtained
+    private editor: EmbeddedMarkdownEditor | null = null;
+    private textarea: HTMLTextAreaElement | null = null;
 
     public constructor(parentEl: HTMLElement, app: App, plugin: SRPlugin) {
         this.app = app;
@@ -25,34 +32,61 @@ export default class CardCommentComponent {
         this.pastEntries = this.container.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
 
-        this.textarea = this.container.createEl("textarea");
-        this.textarea.addClass("sr-card-comment-input");
-        this.textarea.placeholder = t("CARD_NOTE_PLACEHOLDER");
-        this.textarea.rows = 1;
+        this.editor = createEmbeddedMarkdownEditor(
+            app,
+            plugin,
+            this.container,
+            t("CARD_NOTE_PLACEHOLDER"),
+        );
+        if (this.editor) return;
+
+        const textarea = this.container.createEl("textarea");
+        this.textarea = textarea;
+        textarea.addClass("sr-card-comment-input");
+        textarea.placeholder = t("CARD_NOTE_PLACEHOLDER");
+        textarea.rows = 1;
 
         // Grow with content, up to the cap set in CSS, so the rating buttons are never
         // pushed off a phone screen.
-        this.textarea.addEventListener("input", () => this._autoGrow());
+        textarea.addEventListener("input", () => this._autoGrow());
 
         // Esc hands the review keyboard shortcuts back. The review keydown handler in
-        // card-container.tsx already ignores events while a TEXTAREA has focus.
-        this.textarea.addEventListener("keydown", (e: KeyboardEvent) => {
+        // card-container.tsx already ignores events while a text field has focus.
+        textarea.addEventListener("keydown", (e: KeyboardEvent) => {
             if (e.key === "Escape") {
                 e.preventDefault();
                 e.stopPropagation();
-                this.textarea.blur();
+                textarea.blur();
             }
         });
     }
 
+    /** Removes the embedded editor from the plugin; call when the review view closes. */
+    public destroy(): void {
+        this.editor?.destroy();
+        this.editor = null;
+    }
+
+    private getInput(): string {
+        return this.editor ? this.editor.getValue() : (this.textarea?.value ?? "");
+    }
+
+    private setInput(value: string): void {
+        if (this.editor) this.editor.setValue(value);
+        else if (this.textarea) {
+            this.textarea.value = value;
+            this._autoGrow();
+        }
+    }
+
     /**
      * Shows the box for a card, rendering any existing entries above it.
-     * Never focuses the textarea: on desktop that would swallow the rating shortcuts,
+     * Never focuses the input: on desktop that would swallow the rating shortcuts,
      * and on a phone it would raise the keyboard over the rating buttons on every card.
      */
     public async show(cardCommentDefinition: string | null, filePath: string): Promise<void> {
-        this.textarea.value = "";
-        this._autoGrow();
+        this.setInput("");
+        this.editor?.setFilePath(filePath);
         this.pastEntries.empty();
 
         if (cardCommentDefinition) {
@@ -77,19 +111,19 @@ export default class CardCommentComponent {
 
     public hide(): void {
         this.container.addClass("sr-is-hidden");
-        this.textarea.value = "";
+        this.setInput("");
         this.pastEntries.empty();
     }
 
     /** Returns the typed text and clears the box, so it is harvested exactly once. */
     public takeText(): string {
-        const text: string = this.textarea.value;
-        this.textarea.value = "";
-        this._autoGrow();
+        const text: string = this.getInput();
+        this.setInput("");
         return text;
     }
 
     private _autoGrow(): void {
+        if (!this.textarea) return;
         const isPhone: boolean = Platform.isPhone || EmulatedPlatform().isPhone;
         const maxPx: number = isPhone ? 96 : 160;
         this.textarea.setCssProps({ height: "auto" });

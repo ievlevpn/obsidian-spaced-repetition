@@ -45,3 +45,39 @@
     min-height: var(--input-height);
     font-size: var(--font-ui-small);
 }
+
+/* The embedded Obsidian editor (live preview): sized and framed like the plain text box */
+.sr-card-comment-editor {
+    position: relative;
+    max-height: 160px;
+    overflow-y: auto;
+    border: var(--input-border-width) solid var(--background-modifier-border);
+    border-radius: var(--input-radius);
+    background-color: var(--background-modifier-form-field);
+    font-size: var(--font-ui-small);
+
+    & .markdown-source-view.mod-cm6 .cm-scroller {
+        padding: var(--size-4-1) var(--size-4-2);
+    }
+
+    & .markdown-source-view.mod-cm6 .cm-content {
+        min-height: calc(var(--input-height) - 2 * var(--size-4-1));
+    }
+
+    &:focus-within {
+        border-color: var(--background-modifier-border-focus);
+    }
+
+    &.is-empty::before {
+        content: attr(data-placeholder);
+        position: absolute;
+        top: var(--size-4-1);
+        left: var(--size-4-2);
+        color: var(--text-faint);
+        pointer-events: none;
+    }
+}
+
+.is-phone .sr-card-comment-editor {
+    max-height: 96px;
+}
