@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment.css";
-import { App, Platform, setIcon } from "obsidian";
+import { App, Platform } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
@@ -19,6 +19,9 @@ export interface CardCommentInput {
     editIndex: number | null;
 }
 
+// Per-device memory of whether the note box is shown (app.loadLocalStorage)
+const BOX_OPEN_KEY = "sr-card-comment-box-open";
+
 export default class CardCommentComponent {
     private app: App;
     private plugin: SRPlugin;
@@ -32,6 +35,10 @@ export default class CardCommentComponent {
     private entries: CardCommentEntry[] = [];
     private editIndex: number | null = null;
     private editingLine: HTMLDivElement;
+    // The box can be collapsed to a quiet "add note" link; remembered per device
+    private toggleLink: HTMLAnchorElement;
+    private inputEl: HTMLElement;
+    private isOpen: boolean = true;
 
     public constructor(parentEl: HTMLElement, app: App, plugin: SRPlugin) {
         this.app = app;
@@ -43,8 +50,18 @@ export default class CardCommentComponent {
         this.pastEntries = this.container.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
 
-        this.editingLine = this.container.createDiv();
+        // A quiet line between the past notes and the box: "Editing note from …" on the left,
+        // the toggle that hides or shows the box on the right
+        const bar = this.container.createDiv();
+        bar.addClass("sr-card-comment-bar");
+        this.editingLine = bar.createDiv();
         this.editingLine.addClasses(["sr-card-comment-editing", "sr-is-hidden"]);
+        this.toggleLink = bar.createEl("a");
+        this.toggleLink.addClass("sr-card-comment-toggle");
+        this.toggleLink.addEventListener("click", (e: MouseEvent) => {
+            e.preventDefault();
+            this.setOpen(!this.isOpen, true);
+        });
 
         this.editor = createEmbeddedMarkdownEditor(
             app,
@@ -52,8 +69,11 @@ export default class CardCommentComponent {
             this.container,
             t("CARD_NOTE_PLACEHOLDER"),
         );
-        if (this.editor) return;
+        this.inputEl = this.editor ? this.editor.el : this.createTextarea();
+        this.setOpen(this.app.loadLocalStorage(BOX_OPEN_KEY) !== false, false);
+    }
 
+    private createTextarea(): HTMLTextAreaElement {
         const textarea = this.container.createEl("textarea");
         this.textarea = textarea;
         textarea.addClass("sr-card-comment-input");
@@ -73,6 +93,22 @@ export default class CardCommentComponent {
                 textarea.blur();
             }
         });
+        return textarea;
+    }
+
+    /**
+     * Shows or collapses the box. Collapsing keeps what was typed (it is still saved); it
+     * only abandons an edit of a past note.
+     */
+    private setOpen(open: boolean, remember: boolean): void {
+        this.isOpen = open;
+        this.inputEl.toggleClass("sr-is-hidden", !open);
+        this.toggleLink.setText(open ? t("CARD_NOTE_HIDE_BOX") : t("CARD_NOTE_ADD"));
+        if (!open && this.editIndex !== null) {
+            this.stopEditing();
+            this.setInput("");
+        }
+        if (remember) this.app.saveLocalStorage(BOX_OPEN_KEY, open);
     }
 
     /** Removes the embedded editor from the plugin; call when the review view closes. */
@@ -120,12 +156,11 @@ export default class CardCommentComponent {
             body.addClass("sr-card-comment-text");
             await wrapper.renderMarkdownWrapper(entry.text, body, TextDirection.Unspecified);
 
-            // A quiet pencil: loads the entry into the box below; saved like a new comment
-            const editButton = row.createEl("button");
-            editButton.addClass("sr-card-comment-edit");
-            editButton.ariaLabel = t("CARD_NOTE_EDIT");
-            setIcon(editButton, "pencil");
-            editButton.addEventListener("click", (e: MouseEvent) => {
+            // A quiet "edit" link: loads the entry into the box below; saved like a new comment
+            const editLink = row.createEl("a", { text: t("CARD_NOTE_EDIT_LINK") });
+            editLink.addClass("sr-card-comment-edit");
+            editLink.ariaLabel = t("CARD_NOTE_EDIT");
+            editLink.addEventListener("click", (e: MouseEvent) => {
                 e.preventDefault();
                 this.startEditing(index);
             });
@@ -155,6 +190,7 @@ export default class CardCommentComponent {
     private startEditing(index: number): void {
         const entry: CardCommentEntry | undefined = this.entries[index];
         if (!entry) return;
+        if (!this.isOpen) this.setOpen(true, false);
         this.editIndex = index;
         this.setInput(entry.text);
 

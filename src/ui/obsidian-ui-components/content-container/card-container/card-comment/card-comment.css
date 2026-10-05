@@ -33,28 +33,21 @@
     }
 }
 
-/* A quiet pencil: invisible until the entry is hovered on desktop, faint on touch screens */
+/* A quiet "edit" link: invisible until the entry is hovered on desktop, faint on touch screens */
 .sr-card-comment-edit {
     flex-shrink: 0;
     margin-left: auto;
-    padding: 0 var(--size-2-1);
-    height: auto;
-    background: none;
-    box-shadow: none;
+    font-size: var(--font-ui-smaller);
     color: var(--text-faint);
+    text-decoration: none;
     opacity: 0;
     cursor: pointer;
     transition: opacity 120ms ease-out;
 
-    & svg {
-        width: var(--icon-xs);
-        height: var(--icon-xs);
-    }
-
     &:hover,
     &:focus-visible {
         color: var(--text-muted);
-        background: none;
+        text-decoration: underline;
     }
 }
 
@@ -64,7 +57,32 @@
 }
 
 .is-mobile .sr-card-comment-edit {
-    opacity: 0.6;
+    opacity: 0.7;
+}
+
+/* The line between the past notes and the box: editing status left, show/hide toggle right */
+.sr-card-comment-bar {
+    display: flex;
+    align-items: baseline;
+    gap: var(--size-4-2);
+    font-size: var(--font-ui-smaller);
+}
+
+.sr-card-comment-toggle {
+    margin-left: auto;
+    color: var(--text-faint);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--text-muted);
+        text-decoration: underline;
+    }
+}
+
+.sr-card-comment-input.sr-is-hidden,
+.sr-card-comment-editor.sr-is-hidden {
+    display: none;
 }
 
 .sr-card-comment-editing {
@@ -124,7 +142,8 @@
         border-color: var(--background-modifier-border-focus);
     }
 
-    &.is-empty::before {
+    /* The placeholder goes as soon as the cursor is in the box */
+    &.is-empty:not(:focus-within)::before {
         content: attr(data-placeholder);
         position: absolute;
         top: var(--size-4-1);
@@ -136,4 +155,15 @@
 
 .is-phone .sr-card-comment-editor .markdown-source-view.mod-cm6 .cm-scroller {
     max-height: 120px;
+}
+
+/* Editor popups (latex-suite's math preview) inside the note box: no scrollbars */
+.sr-card-comment-editor .cm-tooltip,
+.sr-card-comment-editor .cm-tooltip * {
+    scrollbar-width: none;
+}
+
+.sr-card-comment-editor .cm-tooltip::-webkit-scrollbar,
+.sr-card-comment-editor .cm-tooltip *::-webkit-scrollbar {
+    display: none;
 }
