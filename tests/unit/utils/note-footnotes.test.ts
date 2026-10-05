@@ -2,6 +2,7 @@ import {
     collectCardCommentDefinitions,
     collectCardCommentLabels,
     findFootnoteDefinition,
+    removeFootnoteDefinition,
     upsertFootnoteDefinition,
 } from "src/utils/note-footnotes";
 
@@ -77,9 +78,9 @@ describe("upsertFootnoteDefinition", () => {
             "trailing prose",
             "",
         ].join("\n");
-        expect(upsertFootnoteDefinition(base, "sr-a3f91c", "[^sr-a3f91c]: - *2026-10-03:* only")).toBe(
-            "[^sr-a3f91c]: - *2026-10-03:* only\n\ntrailing prose\n",
-        );
+        expect(
+            upsertFootnoteDefinition(base, "sr-a3f91c", "[^sr-a3f91c]: - *2026-10-03:* only"),
+        ).toBe("[^sr-a3f91c]: - *2026-10-03:* only\n\ntrailing prose\n");
     });
 
     test("preserves CRLF line endings when the note uses them", () => {
@@ -125,5 +126,27 @@ describe("collect helpers", () => {
             "[^sr-a3f91c]: - *2026-10-03:* first\n    - *2026-10-19:* second",
         );
         expect(map.has("1")).toBe(false);
+    });
+});
+
+describe("removeFootnoteDefinition", () => {
+    test("removes a definition at the end with the blank line before it", () => {
+        const text =
+            "Card [^sr-a3f91c]\n\n[^sr-a3f91c]: - *2026-01-01:* note\n    - *2026-01-02:* more\n";
+        expect(removeFootnoteDefinition(text, "sr-a3f91c")).toBe("Card [^sr-a3f91c]\n");
+    });
+
+    test("keeps one blank line between the text around a definition in the middle", () => {
+        const text = "Above\n\n[^sr-a3f91c]: - note\n\nBelow";
+        expect(removeFootnoteDefinition(text, "sr-a3f91c")).toBe("Above\n\nBelow");
+    });
+
+    test("leaves other definitions and CRLF line endings alone", () => {
+        const text = "A\r\n\r\n[^sr-a3f91c]: - x\r\n[^sr-bbbbbb]: - y";
+        expect(removeFootnoteDefinition(text, "sr-a3f91c")).toBe("A\r\n\r\n[^sr-bbbbbb]: - y");
+    });
+
+    test("a missing label changes nothing", () => {
+        expect(removeFootnoteDefinition("no footnotes", "sr-a3f91c")).toBe("no footnotes");
     });
 });

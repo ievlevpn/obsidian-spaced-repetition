@@ -40,7 +40,7 @@ export interface IFlashcardReviewSequencer {
     undo(): Promise<boolean>;
     determineCardSchedule(response: ReviewResponse, card: Card): RepItemScheduleInfo;
     processReview(response: ReviewResponse): Promise<void>;
-    setPendingCardComment(text: string): void;
+    setPendingCardComment(text: string, editIndex?: number | null): void;
     flushPendingCardComment(): Promise<void>;
     updateCurrentQuestionTextAndCards(text: string): Promise<void>;
     deleteCurrentCardFromNote(): Promise<void>;
@@ -145,6 +145,8 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     private pendingCards: PendingCard[] = [];
     private currentTopicPath: TopicPath = TopicPath.emptyPath;
     private pendingCardComment: string | null = null;
+    // Set when the pending text replaces an existing entry of the card's comment
+    private pendingCardCommentEditIndex: number | null = null;
     private undoStack: UndoEntry[] = [];
 
     constructor(
@@ -368,20 +370,29 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
      * Stages comment text typed during review of the current card. It is applied just before
      * the next schedule write, so a comment costs no extra file write.
      */
-    setPendingCardComment(text: string): void {
+    setPendingCardComment(text: string, editIndex: number | null = null): void {
         if (this.reviewMode === FlashcardReviewMode.Cram) return;
         this.pendingCardComment = text;
+        this.pendingCardCommentEditIndex = editIndex;
     }
 
     /** Applies any staged comment to the current question. Returns true if it changed. */
     private applyPendingCardComment(): boolean {
         const text: string | null = this.pendingCardComment;
+        const editIndex: number | null = this.pendingCardCommentEditIndex;
         this.pendingCardComment = null;
+        this.pendingCardCommentEditIndex = null;
         if (this.reviewMode === FlashcardReviewMode.Cram) return false;
-        if (!text || text.trim().length === 0) return false;
 
         const question = this.currentQuestion;
-        if (!question) return false;
+        if (!question || text === null) return false;
+
+        // An edit of an existing entry is written even when blank: that deletes the entry
+        if (editIndex !== null) {
+            question.stageCardCommentEdit(editIndex, text);
+            return true;
+        }
+        if (text.trim().length === 0) return false;
 
         question.stageCardComment(text, globalDateProvider.today.format(PREFERRED_DATE_FORMAT));
         return true;

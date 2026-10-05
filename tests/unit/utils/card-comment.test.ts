@@ -1,6 +1,7 @@
 import {
     appendCardCommentEntry,
     CardCommentEntry,
+    editCardCommentEntry,
     extractCardCommentRef,
     formatCardCommentDefinition,
     formatCardCommentRef,
@@ -48,9 +49,10 @@ describe("the reference token", () => {
     test("extracts it when preceded by a newline, not a space", () => {
         // The own-line case: a card ending in a code fence, or cardCommentOnSameLine false
         expect(extractCardCommentRef("Q1:::A1\n[^sr-a3f91c]")).toEqual(["Q1:::A1", "sr-a3f91c"]);
-        expect(
-            extractCardCommentRef("F\n?\n```\ncode\n```\n[^sr-a3f91c]"),
-        ).toEqual(["F\n?\n```\ncode\n```", "sr-a3f91c"]);
+        expect(extractCardCommentRef("F\n?\n```\ncode\n```\n[^sr-a3f91c]")).toEqual([
+            "F\n?\n```\ncode\n```",
+            "sr-a3f91c",
+        ]);
     });
 
     test("ignores a reference that is not ours", () => {
@@ -126,18 +128,18 @@ describe("parseCardCommentDefinition", () => {
             { date: "2026-10-03", text: "first\nwrapped" },
             { date: "2026-10-19", text: "second" },
         ];
-        expect(parseCardCommentDefinition(formatCardCommentDefinition("sr-a3f91c", entries))).toEqual(
-            entries,
-        );
+        expect(
+            parseCardCommentDefinition(formatCardCommentDefinition("sr-a3f91c", entries)),
+        ).toEqual(entries);
     });
 
     test("round-trips text that legitimately begins with a backslash", () => {
         const entries: CardCommentEntry[] = [
             { date: "2026-10-03", text: "\\- a literal escaped hyphen" },
         ];
-        expect(parseCardCommentDefinition(formatCardCommentDefinition("sr-a3f91c", entries))).toEqual(
-            entries,
-        );
+        expect(
+            parseCardCommentDefinition(formatCardCommentDefinition("sr-a3f91c", entries)),
+        ).toEqual(entries);
     });
 
     test("leaves LaTeX leading backslashes byte-identical in the stored text", () => {
@@ -202,5 +204,38 @@ describe("generateCardCommentLabel", () => {
             expect(taken.has(label)).toBe(false);
             taken.add(label);
         }
+    });
+});
+
+describe("editCardCommentEntry", () => {
+    const def = "[^sr-a3f91c]: - *2026-01-01:* first\n    - *2026-01-02:* second";
+
+    test("replaces an entry's text and keeps its date", () => {
+        expect(editCardCommentEntry(def, "sr-a3f91c", 1, "  revised  ")).toBe(
+            "[^sr-a3f91c]: - *2026-01-01:* first\n    - *2026-01-02:* revised",
+        );
+    });
+
+    test("blank text deletes the entry", () => {
+        expect(editCardCommentEntry(def, "sr-a3f91c", 0, " ")).toBe(
+            "[^sr-a3f91c]: - *2026-01-02:* second",
+        );
+    });
+
+    test("deleting the last entry leaves an empty definition", () => {
+        expect(editCardCommentEntry("[^sr-a3f91c]: - *2026-01-01:* only", "sr-a3f91c", 0, "")).toBe(
+            "",
+        );
+    });
+
+    test("an index that does not exist changes nothing", () => {
+        expect(editCardCommentEntry(def, "sr-a3f91c", 5, "x")).toBe(def);
+        expect(editCardCommentEntry(null, "sr-a3f91c", 0, "x")).toBeNull();
+    });
+
+    test("multi-line text is kept as continuation lines", () => {
+        expect(editCardCommentEntry(def, "sr-a3f91c", 0, "line 1\nline 2")).toBe(
+            "[^sr-a3f91c]: - *2026-01-01:* line 1\n      line 2\n    - *2026-01-02:* second",
+        );
     });
 });

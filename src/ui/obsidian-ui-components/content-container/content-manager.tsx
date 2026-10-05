@@ -353,7 +353,7 @@ export default class ContentManager {
                 // Discard any typed comment: NotesDataStore.delete leaves the [^sr-...]
                 // definition behind, so flushing here would write a definition that is
                 // orphaned a moment later. Just clear the box.
-                this.cardContainer.takeCardCommentText();
+                this.cardContainer.takeCardCommentInput();
                 await this.reviewSequencer.deleteCurrentCardFromNote();
                 await this._showNextCard();
             },
@@ -547,7 +547,8 @@ export default class ContentManager {
     /** Stages any typed comment. Call before leaving a card by any route. */
     private _stageCardComment(): void {
         if (this.reviewSequencer === null) return;
-        this.reviewSequencer.setPendingCardComment(this.cardContainer.takeCardCommentText());
+        const { text, editIndex } = this.cardContainer.takeCardCommentInput();
+        this.reviewSequencer.setPendingCardComment(text, editIndex);
     }
 
     private _determineButtonSchedule(reviewResponse: ReviewResponse): RepItemScheduleInfo | null {

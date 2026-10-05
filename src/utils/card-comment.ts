@@ -81,10 +81,7 @@ export function extractCardCommentRef(text: string): [string, string | null] {
  * entry. See the limitation on isFootnoteContinuationLine above: leave a blank line before
  * anything you add under an `sr-` footnote.
  */
-export function formatCardCommentDefinition(
-    label: string,
-    entries: CardCommentEntry[],
-): string {
+export function formatCardCommentDefinition(label: string, entries: CardCommentEntry[]): string {
     if (entries.length === 0) return "";
 
     const lines: string[] = [];
@@ -153,6 +150,25 @@ export function appendCardCommentEntry(
 
     const entries = definition ? parseCardCommentDefinition(definition) : [];
     entries.push({ date, text: trimmed });
+    return formatCardCommentDefinition(label, entries);
+}
+
+/**
+ * Replaces the text of entry `index` (keeping its date), or deletes the entry when `text` is
+ * blank. Returns the new definition, "" when no entries remain (the footnote should then be
+ * removed), or the definition unchanged when `index` does not exist.
+ */
+export function editCardCommentEntry(
+    definition: string | null,
+    label: string,
+    index: number,
+    text: string,
+): string | null {
+    const entries = definition ? parseCardCommentDefinition(definition) : [];
+    if (index < 0 || index >= entries.length) return definition;
+    const trimmed = text.trim();
+    if (trimmed.length === 0) entries.splice(index, 1);
+    else entries[index] = { ...entries[index], text: trimmed };
     return formatCardCommentDefinition(label, entries);
 }
 

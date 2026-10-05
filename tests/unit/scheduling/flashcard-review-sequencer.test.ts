@@ -958,6 +958,64 @@ describe("card comments", () => {
         expect(fileText).not.toContain("[^sr-");
     });
 
+    describe("editing a past entry", () => {
+        const twoEntries =
+            "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* first\n    - *2026-01-02:* second";
+
+        test("replaces the entry's text, keeps its date, adds no entry", async () => {
+            const c: TestContext = await contextWith(twoEntries);
+            c.reviewSequencer.setPendingCardComment("first, revised", 0);
+            await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toContain(
+                "[^sr-a3f91c]: - *2026-01-01:* first, revised\n    - *2026-01-02:* second",
+            );
+            expect(fileText.match(/\*20\d\d-\d\d-\d\d:\*/g)).toHaveLength(2);
+        });
+
+        test("emptying an entry deletes it", async () => {
+            const c: TestContext = await contextWith(twoEntries);
+            c.reviewSequencer.setPendingCardComment("   ", 1);
+            await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toContain("[^sr-a3f91c]: - *2026-01-01:* first");
+            expect(fileText).not.toContain("second");
+        });
+
+        test("emptying the only entry removes the footnote and the card's reference", async () => {
+            const c: TestContext = await contextWith(
+                "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* only",
+            );
+            c.reviewSequencer.setPendingCardComment("", 0);
+            await c.reviewSequencer.processReview(ReviewResponse.Good);
+
+            const fileText: string = await c.file.read();
+            expect(fileText).not.toContain("sr-a3f91c");
+            expect(fileText).toMatch(/^#flashcards Q1::A1 <!--SR:![^\n]+-->\n?$/);
+        });
+
+        test("is written by a flush without rating, as when skipping", async () => {
+            const c: TestContext = await contextWith(twoEntries);
+            c.reviewSequencer.setPendingCardComment("edited", 1);
+            await c.reviewSequencer.flushPendingCardComment();
+
+            const fileText: string = await c.file.read();
+            expect(fileText).toContain("    - *2026-01-02:* edited");
+            expect(fileText).toContain("<!--SR:!2023-09-02,4,270-->"); // schedule untouched
+        });
+
+        test("an entry index that no longer exists changes nothing", async () => {
+            const c: TestContext = await contextWith(twoEntries);
+            c.reviewSequencer.setPendingCardComment("x", 7);
+            await c.reviewSequencer.processReview(ReviewResponse.Good);
+            expect(await c.file.read()).toContain(
+                "[^sr-a3f91c]: - *2026-01-01:* first\n    - *2026-01-02:* second",
+            );
+        });
+    });
+
     test("a second comment extends the same definition and reuses the label", async () => {
         const c: TestContext = await contextWith(
             "#flashcards Q1::A1 [^sr-a3f91c] <!--SR:!2023-09-02,4,270-->\n\n[^sr-a3f91c]: - *2026-01-01:* earlier",
