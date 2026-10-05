@@ -17,6 +17,9 @@ export interface IBaseLocale {
     UNDO: string;
     CARD_NOTE_PLACEHOLDER: string;
     CARD_NOTE_EDIT: string;
+    CARD_NOTE_EDIT_LINK: string;
+    CARD_NOTE_HIDE_BOX: string;
+    CARD_NOTE_ADD: string;
     CARD_NOTE_EDITING: string;
     CARD_NOTE_EDITING_UNDATED: string;
     EDIT_CARD: string;
