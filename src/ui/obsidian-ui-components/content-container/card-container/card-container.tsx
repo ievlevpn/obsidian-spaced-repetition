@@ -69,6 +69,7 @@ export class CardContainer {
         jumpToCurrentCardHandler: () => Promise<void>,
         displayCurrentCardInfoNoticeHandler: () => void,
         undoHandler: () => Promise<void>,
+        saveCardCommentHandler: () => Promise<void>,
         closeModal?: () => void,
     ) {
         // Init properties
@@ -135,7 +136,7 @@ export class CardContainer {
         // narrow column beside the card content. The view is a column flex, which puts the box
         // under the answer and above the rating buttons. It is still outside this.content, so
         // drawCardFrontContent's content.empty() cannot destroy it.
-        this.cardComment = new CardCommentComponent(this.view, app, plugin);
+        this.cardComment = new CardCommentComponent(this.view, app, plugin, saveCardCommentHandler);
 
         this.response = new ResponseSectionComponent(
             this.view,
@@ -304,6 +305,19 @@ export class CardContainer {
     }
 
     /** Returns text typed into the comment box and clears it. */
+    /**
+     * Re-draws the comment box after a note was saved without rating, keeping the earlier
+     * notes expanded if they were, and puts the cursor back for the next note.
+     */
+    public async refreshCardComment(sessionData: SessionData): Promise<void> {
+        await this.cardComment.show(
+            sessionData.currentQuestion.cardCommentDefinition,
+            sessionData.currentNote.filePath,
+            true,
+        );
+        this.cardComment.focus();
+    }
+
     public takeCardCommentInput(): CardCommentInput {
         return this.cardComment.takeInput();
     }

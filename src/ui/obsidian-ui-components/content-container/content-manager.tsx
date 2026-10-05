@@ -127,6 +127,7 @@ export default class ContentManager {
             this._jumpToCurrentCard.bind(this),
             this._displayCurrentCardInfoNotice.bind(this),
             this._undo.bind(this),
+            this._saveCardCommentNow.bind(this),
             closeModal,
         );
     }
@@ -485,6 +486,17 @@ export default class ContentManager {
         await this.reviewSequencer.flushPendingCardComment();
         this.reviewSequencer.skipCurrentCard();
         await this._showNextCard();
+    }
+
+    /**
+     * Saves the note box's content now, without rating the card, so several notes can be
+     * added in a row.
+     */
+    public async _saveCardCommentNow(): Promise<void> {
+        if (this.reviewSequencer === null || this.sessionData === null) return;
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
+        await this.cardContainer.refreshCardComment(this.sessionData);
     }
 
     /**

@@ -20,6 +20,11 @@ export interface IBaseLocale {
     CARD_NOTE_EDIT_LINK: string;
     CARD_NOTE_HIDE_BOX: string;
     CARD_NOTE_ADD: string;
+    CARD_NOTE_SAVE: string;
+    CARD_NOTE_SAVE_HINT: string;
+    CARD_NOTE_SHOW_EARLIER: string;
+    CARD_NOTE_SHOW_EARLIER_ONE: string;
+    CARD_NOTE_SHOW_FEWER: string;
     CARD_NOTE_EDITING: string;
     CARD_NOTE_EDITING_UNDATED: string;
     EDIT_CARD: string;
