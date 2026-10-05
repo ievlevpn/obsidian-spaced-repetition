@@ -246,9 +246,26 @@ export class CardContainer {
         }
     }
 
+    /**
+     * A quiet "new" / "seen" label at the top right of the card (floated, so the card's text
+     * flows around it): whether the card has been rated before, i.e. has a schedule.
+     */
+    private drawCardStatus(sessionData: SessionData): void {
+        const card = sessionData.cardData.currentCard;
+        if (!card) return;
+        const seen: boolean = card.hasSchedule;
+        const label = this.content.createDiv({
+            cls: ["sr-card-status", seen ? "is-seen" : "is-new"],
+            text: seen ? t("CARD_STATUS_SEEN") : t("CARD_STATUS_NEW"),
+        });
+        label.ariaLabel = seen ? t("CARD_STATUS_SEEN_HINT") : t("CARD_STATUS_NEW_HINT");
+    }
+
     private async drawCardFrontContent(sessionData: SessionData, settings: SRSettings) {
         // Update card content
         this.content.empty();
+
+        this.drawCardStatus(sessionData);
 
         // Create context section
         this.drawCardContext(sessionData, settings);
@@ -421,6 +438,7 @@ export class CardContainer {
             this.content.appendChild(hr);
         } else {
             this.content.empty();
+            this.drawCardStatus(sessionData);
             this.drawCardContext(sessionData, settings);
         }
 
