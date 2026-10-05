@@ -242,6 +242,11 @@ const en: IBaseLocale = {
     SWIPE_TO_SKIP_DESC:
         'While reviewing, swipe left from the right edge of the screen to skip the card. Release once the indicator turns to "Release to skip"; release earlier to cancel.',
     SWIPE_RELEASE_TO_SKIP: "Release to skip",
+    SWIPE_BACK: "Back",
+    SWIPE_RELEASE_TO_GO_BACK: "Release to go back",
+    SWIPE_TO_UNDO: "Swipe from the left edge to go back",
+    SWIPE_TO_UNDO_DESC:
+        "While reviewing, swipe right from the left edge of the screen to go back to the previous card, undoing your last answer or skip (like the Undo button).",
     STATUS_BAR_SETTINGS: "Status Bar",
     SHOW_STATUS_BAR: "Show status bar",
     SHOW_STATUS_BAR_DESC: "Turn this off to hide all status messages in Obsidian's status bar",

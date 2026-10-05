@@ -51,6 +51,19 @@ export class MobilePage extends SettingsPage {
                                 await this.settingsManager.save();
                             }),
                     );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName(t("SWIPE_TO_UNDO"))
+                    .setDesc(t("SWIPE_TO_UNDO_DESC"))
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(this.settingsManager.settings.mobileSwipeToUndo)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.mobileSwipeToUndo = value;
+                                await this.settingsManager.save();
+                            }),
+                    );
             });
     }
 }

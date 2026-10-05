@@ -21,7 +21,7 @@ import {
     SessionData,
 } from "src/ui/obsidian-ui-components/content-container/content-manager";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
-import { attachRightEdgeSwipe } from "src/utils/edge-swipe";
+import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
 import { escapeHtml } from "src/utils/escape-html";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
@@ -34,6 +34,10 @@ export class CardContainer {
     private cardState: CardState;
 
     private view: HTMLDivElement;
+    // Whether the undo button is enabled, which also arms the left-edge swipe
+    private undoAvailable: boolean = false;
+    // Removes the edge-swipe listeners (they live on the window)
+    private detachSwipes: (() => void)[] = [];
 
     private toolbar: CardToolbarComponent;
     private contextSection: ContextSectionComponent | null = null;
@@ -118,17 +122,40 @@ export class CardContainer {
         this.content = this.scrollWrapper.createDiv();
         this.content.addClass("sr-content");
 
-        // Mobile: swiping left from the right edge skips the card, like the Skip button. The
-        // setting is read when a touch begins, so turning it off takes effect immediately.
+        // Mobile edge swipes: from the right edge to skip (like the Skip button), from the left
+        // edge to go back to the previous card (like Undo). The settings are read when a touch
+        // begins, so turning one off takes effect immediately.
         if (Platform.isMobile || EmulatedPlatform().isMobile) {
-            const feedback = new SwipeFeedbackComponent(this.scrollWrapper);
-            attachRightEdgeSwipe(this.view, {
-                isActive: () =>
-                    settings.mobileSwipeToSkip &&
-                    (this.cardState === CardState.Front || this.cardState === CardState.Back),
-                onMove: (dx, armed) => feedback.move(dx, armed),
-                onRelease: (committed) => feedback.release(committed, () => this.skipCardHandler()),
+            const win: Window = this.view.win ?? window;
+            const skipFeedback = new SwipeFeedbackComponent(this.scrollWrapper, {
+                side: "right",
+                icon: "skip-forward",
+                label: t("SKIP"),
+                armedLabel: t("SWIPE_RELEASE_TO_SKIP"),
             });
+            const backFeedback = new SwipeFeedbackComponent(this.scrollWrapper, {
+                side: "left",
+                icon: "undo-2",
+                label: t("SWIPE_BACK"),
+                armedLabel: t("SWIPE_RELEASE_TO_GO_BACK"),
+            });
+            this.detachSwipes.push(
+                attachEdgeSwipe(win, "right", {
+                    isActive: (start) => settings.mobileSwipeToSkip && this.acceptsSwipe(start),
+                    onMove: (dx, armed) => skipFeedback.move(dx, armed),
+                    onRelease: (committed) =>
+                        skipFeedback.release(committed, () => this.skipCardHandler()),
+                }),
+                attachEdgeSwipe(win, "left", {
+                    isActive: (start) =>
+                        settings.mobileSwipeToUndo &&
+                        this.undoAvailable &&
+                        this.acceptsSwipe(start),
+                    onMove: (dx, armed) => backFeedback.move(dx, armed),
+                    onRelease: (committed) =>
+                        backFeedback.release(committed, () => void this.undoHandler()),
+                }),
+            );
         }
 
         // Attached to the view, not the scroll wrapper. The wrapper is a `display: flex` with no
@@ -148,9 +175,19 @@ export class CardContainer {
 
     // #region -> public methods
 
-    /** Releases what outlives the view (the comment box's embedded editor). */
+    /** Releases what outlives the view (the comment box's embedded editor, swipe listeners). */
     destroy(): void {
         this.cardComment.destroy();
+        this.detachSwipes.forEach((detach) => detach());
+        this.detachSwipes = [];
+    }
+
+    // An edge swipe applies while a card is shown and the touch is level with the review view
+    private acceptsSwipe(start: Point): boolean {
+        if (this.cardState !== CardState.Front && this.cardState !== CardState.Back) return false;
+        if (!this.view.isShown()) return false;
+        const rect: DOMRect = this.view.getBoundingClientRect();
+        return start.y >= rect.top && start.y <= rect.bottom;
     }
 
     /**
@@ -159,6 +196,7 @@ export class CardContainer {
      * @param available - Whether there is something to undo
      */
     setUndoAvailable(available: boolean): void {
+        this.undoAvailable = available;
         this.toolbar.setUndoButtonDisabled(!available);
     }
 
