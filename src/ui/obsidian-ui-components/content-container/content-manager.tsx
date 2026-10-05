@@ -138,6 +138,7 @@ export default class ContentManager {
         this.uiManager.setSRViewInFocus(false);
         this.deckContainer.closeList();
         this.cardContainer.closeSession();
+        this.cardContainer.destroy();
         this.uiManager.setUIState(UIState.Closed);
     }
 

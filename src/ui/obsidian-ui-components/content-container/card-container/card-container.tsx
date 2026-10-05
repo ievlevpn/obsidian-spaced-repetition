@@ -145,6 +145,11 @@ export class CardContainer {
 
     // #region -> public methods
 
+    /** Releases what outlives the view (the comment box's embedded editor). */
+    destroy(): void {
+        this.cardComment.destroy();
+    }
+
     /**
      * Enables or greys out the undo button.
      *
@@ -464,7 +469,9 @@ export class CardContainer {
             this.plugin.dataManager.data.settings.useCustomHotkeys ||
             (activeDocument.activeElement !== null &&
                 (activeDocument.activeElement.nodeName === "TEXTAREA" ||
-                    activeDocument.activeElement.nodeName === "INPUT")) ||
+                    activeDocument.activeElement.nodeName === "INPUT" ||
+                    // the embedded markdown editor of the card comment box
+                    (activeDocument.activeElement as HTMLElement).isContentEditable)) ||
             this.cardState === CardState.Closed ||
             !this.plugin.uiManager.getSRInFocusState() ||
             Platform.isMobile || // No keyboard events on mobile
