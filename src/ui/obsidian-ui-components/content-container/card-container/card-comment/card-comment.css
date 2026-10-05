@@ -99,11 +99,11 @@
     font-size: var(--font-ui-small);
 }
 
-/* The embedded Obsidian editor (live preview): sized and framed like the plain text box */
+/* The embedded Obsidian editor (live preview): framed like the plain text box. It scrolls inside
+   CodeMirror's own scroller, not the frame: editor popups (e.g. latex-suite's math preview) sit
+   beside the scroller, so a scrolling frame would clip them. */
 .sr-card-comment-editor {
     position: relative;
-    max-height: 160px;
-    overflow-y: auto;
     border: var(--input-border-width) solid var(--background-modifier-border);
     border-radius: var(--input-radius);
     background-color: var(--background-modifier-form-field);
@@ -111,10 +111,13 @@
 
     & .markdown-source-view.mod-cm6 .cm-scroller {
         padding: var(--size-4-1) var(--size-4-2);
+        max-height: 200px;
+        overflow-y: auto;
     }
 
     & .markdown-source-view.mod-cm6 .cm-content {
-        min-height: calc(var(--input-height) - 2 * var(--size-4-1));
+        /* about two and a half lines, so there is room to write without it feeling cramped */
+        min-height: 4em;
     }
 
     &:focus-within {
@@ -131,6 +134,6 @@
     }
 }
 
-.is-phone .sr-card-comment-editor {
-    max-height: 96px;
+.is-phone .sr-card-comment-editor .markdown-source-view.mod-cm6 .cm-scroller {
+    max-height: 120px;
 }
