@@ -1,6 +1,6 @@
-// A real Obsidian markdown editor embedded in a plugin view, so the card comment box gets live
-// preview, math rendering, and every editor extension other plugins register (e.g. the snippets
-// of obsidian-latex-suite), exactly as in a note.
+// A real Obsidian markdown editor embedded in a plugin view or modal, so the card comment box and
+// the edit card window get live preview, math rendering, and every editor extension other plugins
+// register (e.g. the snippets of obsidian-latex-suite), exactly as in a note.
 //
 // Obsidian has no public API for this. The editor class is taken from one of Obsidian's own
 // embedded markdown views, the same technique the Kanban plugin uses. Everything private stays
@@ -9,7 +9,7 @@
 
 import { App, Component, Platform, TFile } from "obsidian";
 
-// The public Editor API the comment box uses, plus the CodeMirror view behind it
+// The public Editor API the callers use, plus the CodeMirror view behind it
 interface EditorLike {
     getValue(): string;
     focus(): void;
@@ -67,7 +67,7 @@ function resolveEditorClass(app: App): MarkdownEditorClass | null {
     return editorClass;
 }
 
-// Line numbers and fold markers make no sense in a small comment box: hide them from this
+// Line numbers and fold markers make no sense in a small embedded box: hide them from this
 // editor only, by answering for those vault settings through a proxy of the app.
 function appWithoutGutters(app: App): App {
     const hidden = new Set(["showLineNumber", "foldHeading", "foldIndent"]);
@@ -103,6 +103,7 @@ export interface EmbeddedMarkdownEditor {
  * @param app - The app
  * @param parent - The component that owns the editor (unloading it unloads the editor)
  * @param parentEl - Where to put the editor
+ * @param cls - CSS class of the editor's frame
  * @param placeholder - Shown while the editor is empty
  * @returns The editor, or null if Obsidian's editor class could not be obtained
  */
@@ -110,16 +111,17 @@ export function createEmbeddedMarkdownEditor(
     app: App,
     parent: Component,
     parentEl: HTMLElement,
+    cls: string,
     placeholder: string,
 ): EmbeddedMarkdownEditor | null {
     const EditorClass = resolveEditorClass(app);
     if (!EditorClass) return null;
 
-    const el = parentEl.createDiv("sr-card-comment-editor");
+    const el = parentEl.createDiv(cls);
     el.dataset.placeholder = placeholder;
     let filePath: string | null = null;
     let instance: MarkdownEditorLike;
-    // What the editor sees as its view: the file is the note the comment is written to, so
+    // What the editor sees as its view: the file is the note the text is written to, so
     // links and attachments resolve relative to it. getMode "source" is the editing view;
     // live preview follows the vault's own "Default editing mode".
     const owner = {

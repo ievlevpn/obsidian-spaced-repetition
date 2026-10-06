@@ -6,7 +6,7 @@ import type SRPlugin from "src/main";
 import {
     createEmbeddedMarkdownEditor,
     EmbeddedMarkdownEditor,
-} from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/embedded-markdown-editor";
+} from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import { CardCommentEntry, parseCardCommentDefinition } from "src/utils/card-comment";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
@@ -96,6 +96,7 @@ export default class CardCommentComponent {
             app,
             plugin,
             this.container,
+            "sr-card-comment-editor",
             t("CARD_NOTE_PLACEHOLDER"),
         );
         this.inputEl = this.editor ? this.editor.el : this.createTextarea();
