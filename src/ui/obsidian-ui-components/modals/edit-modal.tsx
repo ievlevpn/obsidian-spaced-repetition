@@ -21,8 +21,11 @@ export class FlashcardEditModal extends Modal {
     public changedText: string;
     public waitForClose: Promise<string>;
 
-    private fieldFront: EditField;
+    // Created in onOpen: an editor filled while the modal is still off-screen stays blank until
+    // it is focused, so the back field showed nothing
+    private fieldFront: EditField | null = null;
     private fieldBack: EditField | null = null;
+    private responseEl: HTMLDivElement;
     // Owns the embedded editors; unloaded when the modal closes
     private editorHost = new Component();
     private saveButton: ButtonComponent;
@@ -121,15 +124,9 @@ export class FlashcardEditModal extends Modal {
             return false;
         });
 
-        this.editorHost.load();
-        const filePath = currentCard.question.note.filePath;
-        this.fieldFront = this.createField(this.textFront, filePath);
-        if (this.separator !== null) {
-            this.fieldBack = this.createField(this.textBack, filePath);
-        }
-
         const response: HTMLDivElement = this.contentEl.createDiv();
         response.addClass("sr-response");
+        this.responseEl = response;
 
         const saveButton = new ButtonComponent(response);
         saveButton.setClass("sr-response-button");
@@ -163,6 +160,12 @@ export class FlashcardEditModal extends Modal {
      */
     async onOpen() {
         await super.onOpen();
+        this.editorHost.load();
+        const filePath = this.currentCard.question.note.filePath;
+        this.fieldFront = this.createField(this.textFront, filePath);
+        if (this.separator !== null) {
+            this.fieldBack = this.createField(this.textBack, filePath);
+        }
         this.fieldFront.focus();
     }
 
@@ -226,6 +229,8 @@ export class FlashcardEditModal extends Modal {
         if (this.textDirection === TextDirection.Rtl) {
             field.el.setAttribute("dir", "rtl");
         }
+        // Above the Save / Cancel buttons
+        this.contentEl.insertBefore(field.el, this.responseEl);
         return field;
     }
 
@@ -235,7 +240,7 @@ export class FlashcardEditModal extends Modal {
 
     private isAnyFieldEmpty(): boolean {
         const isBackEmpty = this.fieldBack !== null && this.fieldBack.getValue().length === 0;
-        return isBackEmpty || this.fieldFront.getValue().length === 0;
+        return isBackEmpty || (this.fieldFront?.getValue() ?? "").length === 0;
     }
 
     private emptyListenerCallback = () => {
@@ -261,7 +266,7 @@ export class FlashcardEditModal extends Modal {
     private save() {
         if (this.didSaveChanges || this.isAnyFieldEmpty()) return;
         this.didSaveChanges = true;
-        const front = this.fieldFront.getValue();
+        const front = this.fieldFront?.getValue() ?? "";
         const back = this.fieldBack?.getValue() ?? "";
         this.changedText = front;
         if (this.separator) {
