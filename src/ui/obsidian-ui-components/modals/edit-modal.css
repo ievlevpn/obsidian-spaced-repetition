@@ -20,6 +20,39 @@
     resize: none;
 }
 
+/* The embedded Obsidian editor (live preview): framed like the plain text box and filling the
+   same space. It scrolls inside CodeMirror's own scroller, not the frame, so editor popups
+   (latex-suite's math preview) are not clipped at the frame's border. */
+.sr-edit-view .sr-edit-editor {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    border: var(--input-border-width) solid var(--background-modifier-border);
+    border-radius: var(--input-radius);
+    background-color: var(--background-modifier-form-field);
+    cursor: text;
+
+    &:focus-within {
+        border-color: var(--background-modifier-border-focus);
+    }
+
+    & .markdown-source-view.mod-cm6 {
+        flex: 1 1 0;
+        min-height: 0;
+    }
+
+    & .markdown-source-view.mod-cm6 .cm-editor {
+        height: 100%;
+    }
+
+    & .markdown-source-view.mod-cm6 .cm-scroller {
+        padding: var(--size-4-2) var(--size-4-3);
+        overflow-y: auto;
+    }
+}
+
 .sr-edit-view .sr-response {
     display: grid;
     grid-template-columns: auto auto auto;
