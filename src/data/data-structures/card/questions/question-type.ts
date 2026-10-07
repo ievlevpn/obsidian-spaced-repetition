@@ -129,7 +129,8 @@ class QuestionTypeCloze implements IQuestionTypeHandler {
         if (clozeNote === null) return result;
 
         for (let i = 0; i < clozeNote.numCards; i++) {
-            const render = (side: string) => restoreMath(restoreMathClozes(side, clozes));
+            // The formula goes back first, so a restored cloze sees the commands next to it
+            const render = (side: string) => restoreMathClozes(restoreMath(side), clozes);
             const front = render(clozeNote.getCardFront(i, clozeFormatter));
             const back = render(clozeNote.getCardBack(i, clozeFormatter));
             result.push(new CardFrontBack(front, back));
