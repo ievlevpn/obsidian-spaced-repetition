@@ -39,6 +39,9 @@ import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
 import { removeCommonIndent } from "src/utils/strings";
 
+// The colour the asked cloze and its answer are drawn in (#2196f3), as the browser reports it
+const ASKED_CLOZE_COLOR = "rgb(33, 150, 243)";
+
 // TODO: Refactor cloze rendering into the renderers file
 export class CardContainer {
     private app: App;
@@ -331,6 +334,7 @@ export class CardContainer {
         // Update card content
         await this.drawCardFrontContent(sessionData, settings);
         this.drawTypedInput(sessionData, settings);
+        if (sessionData.currentQuestion.questionType === CardType.Cloze) this.scrollToAskedCloze();
         this.cardComment.hide();
 
         // Update response buttons
@@ -347,6 +351,40 @@ export class CardContainer {
                 firstInput.focus();
             }
         }
+    }
+
+    /**
+     * In a card taller than the view, scrolls the cloze being asked (or, on the back, its
+     * answer) into view, about a third of the way down, so the lines leading up to it show too.
+     * A card that fits is left alone.
+     */
+    private scrollToAskedCloze(): void {
+        const content: HTMLDivElement = this.content;
+        const scroll = (): void => {
+            if (content.scrollHeight <= content.clientHeight) return;
+            const cloze: HTMLElement | null = this.findAskedCloze();
+            if (cloze === null) return;
+            const top: number =
+                cloze.getBoundingClientRect().top -
+                content.getBoundingClientRect().top +
+                content.scrollTop;
+            content.scrollTop = Math.max(0, top - content.clientHeight / 3);
+        };
+        // After layout: math and embeds can still change the height right after rendering
+        const win: Window = content.win ?? window;
+        win.requestAnimationFrame(() => win.requestAnimationFrame(scroll));
+    }
+
+    // The asked cloze, or its answer on the back: the first element in the cloze colour (text
+    // clozes are spans, math clozes MathJax's \color), or a typed-answer field
+    private findAskedCloze(): HTMLElement | null {
+        const candidates = this.content.querySelectorAll<HTMLElement>("[style], .cloze-input");
+        for (const el of Array.from(candidates)) {
+            if (el.classList.contains("cloze-input") || el.style.color === ASKED_CLOZE_COLOR) {
+                return el;
+            }
+        }
+        return null;
     }
 
     // A field under the question of a non-cloze card whose answer is short plain text
@@ -613,6 +651,7 @@ export class CardContainer {
         // Evaluate cloze answers
         if (sessionData.currentQuestion.questionType === CardType.Cloze) {
             typedExact = this._evaluateClozeAnswers();
+            this.scrollToAskedCloze();
         }
 
         // The comment box is suppressed for any card that contains a ">" line anywhere.
