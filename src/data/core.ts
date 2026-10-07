@@ -40,6 +40,14 @@ export class OsrCore {
     private fullDeckTree: Deck | null = null;
     // Suspended cards: kept out of every deck, listed in the Suspended cards view
     private _suspendedCards: Card[] = [];
+
+    // Parsed notes kept between loads and reused while the file is unchanged, so a sync (on
+    // every review opened) only parses the notes that changed. Any change of the settings
+    // clears it. Every change the plugin makes to a card is written to its note, which
+    // changes the file and so its key.
+    private noteCache: Map<string, { key: string; note: Note }> = new Map();
+    private noteCacheSettings: string = "";
+    private notesSeenThisLoad: Set<string> = new Set();
     private _reviewableDeckTree: Deck = new Deck("root", null);
     private _remainingDeckTree: Deck | null = null;
     private _cardStats: Stats | null = null;
@@ -204,6 +212,18 @@ export class OsrCore {
         // reset flashcards stuff
         this.fullDeckTree = new Deck("root", null);
         this._suspendedCards = [];
+
+        // Parsing reads the date too (an SM-2 schedule keeps its delay relative to today), so
+        // a new day clears it as well
+        const settings: string =
+            JSON.stringify(this.settings) +
+            this.defaultTextDirection +
+            globalDateProvider.today.format("YYYY-MM-DD");
+        if (settings !== this.noteCacheSettings) {
+            this.noteCache.clear();
+            this.noteCacheSettings = settings;
+        }
+        this.notesSeenThisLoad.clear();
     }
 
     /**
@@ -286,6 +306,12 @@ export class OsrCore {
         if (this.fullDeckTree === null) {
             return;
         }
+
+        // Forget notes that are gone, renamed, or no longer hold flashcards
+        for (const path of [...this.noteCache.keys()]) {
+            if (!this.notesSeenThisLoad.has(path)) this.noteCache.delete(path);
+        }
+
         this._reviewableDeckTree = this.fullDeckTree
             ? this.fullDeckTree.clone()
             : new Deck("root", null);
@@ -403,10 +429,21 @@ export class OsrCore {
      * @returns {Promise<Note | null>} - A promise that resolves with the loaded note.
      */
     async loadNote(noteFile: ISRNoteTFile, topicPath: TopicPath): Promise<Note | null> {
+        const version: string | null = noteFile.versionKey;
+        const key: string | null =
+            version === null ? null : `${version}|${topicPath.path.join("/")}`;
+        this.notesSeenThisLoad.add(noteFile.path);
+        const cached = this.noteCache.get(noteFile.path);
+        if (key !== null && cached?.key === key) return cached.note;
+
         const loader: NoteFileLoader = new NoteFileLoader(this.settings);
         const note: Note | null = await loader.load(noteFile, this.defaultTextDirection, topicPath);
         if (note !== null && note.hasChanged) {
+            // Writing changes the file, so it is parsed again next time rather than cached
             await note.writeNoteFile(this.settings);
+            this.noteCache.delete(noteFile.path);
+        } else if (note !== null && key !== null) {
+            this.noteCache.set(noteFile.path, { key, note });
         }
         return note;
     }

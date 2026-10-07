@@ -24,6 +24,13 @@ export class OsrNoteGraph {
     incomingLinks: Record<string, LinkStat[]> = {};
     pageranks: Record<string, number> = {};
 
+    // The links added since the last reset, and those the last page ranks were computed from:
+    // a sync with the same links (the common case) reuses the ranks instead of recomputing them.
+    // Static: every sync makes a new graph (and pagerank.js keeps one global graph anyway).
+    private links: string[] = [];
+    private static rankedLinks: string | null = null;
+    private static rankedPageranks: Record<string, number> = {};
+
     constructor(vaultNoteLinkInfoFinder: IOsrVaultNoteLinkInfoFinder) {
         this.vaultNoteLinkInfoFinder = vaultNoteLinkInfoFinder;
         this.reset();
@@ -32,6 +39,7 @@ export class OsrNoteGraph {
     reset() {
         this.incomingLinks = {};
         this.pageranks = {};
+        this.links = [];
         graph.reset();
     }
 
@@ -54,6 +62,7 @@ export class OsrNoteGraph {
                 });
 
                 graph.link(path, targetPath, linkCount);
+                this.links.push(`${path}\u0000${targetPath}\u0000${linkCount}`);
             }
         }
     }
@@ -89,8 +98,15 @@ export class OsrNoteGraph {
     }
 
     generatePageRanks() {
+        const links: string = this.links.sort().join("\n");
+        if (links === OsrNoteGraph.rankedLinks) {
+            this.pageranks = { ...OsrNoteGraph.rankedPageranks };
+            return;
+        }
         graph.rank(0.85, 0.000001, (node: string, rank: number) => {
             this.pageranks[node] = rank * 10000;
         });
+        OsrNoteGraph.rankedLinks = links;
+        OsrNoteGraph.rankedPageranks = { ...this.pageranks };
     }
 }

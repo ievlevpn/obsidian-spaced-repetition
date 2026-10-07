@@ -21,6 +21,11 @@ export interface ISRFile {
     get path(): string;
     get basename(): string;
     get tfile(): TFile;
+    /**
+     * Changes whenever the file's content does (modification time and size), so a parsed copy
+     * can be reused while it is unchanged; null when unknown, which disables reuse.
+     */
+    get versionKey(): string | null;
     getFrontmatter(): Promise<Map<string, string>>;
     getAllTagsFromCache(): string[];
     getAllTagsFromText(): TagCache[];
@@ -72,6 +77,11 @@ export abstract class SRTFile implements ISRFile {
      */
     get path(): string {
         return this.file.path;
+    }
+
+    get versionKey(): string | null {
+        const stat = this.file.stat;
+        return stat ? `${stat.mtime}:${stat.size}` : null;
     }
 
     /**

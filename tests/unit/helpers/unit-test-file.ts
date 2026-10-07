@@ -14,6 +14,8 @@ import { unitTestBasicFrontmatterParser, unitTestGetAllTagsFromTextEx } from "./
 export class UnitTestSRFile implements ISRNoteTFile {
     content: string;
     _path: string;
+    // Unknown by default, so notes are always parsed afresh; a test of note reuse sets it
+    versionKey: string | null = null;
 
     constructor(content: string, path: string = null) {
         this.content = content;
