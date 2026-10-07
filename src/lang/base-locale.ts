@@ -19,6 +19,8 @@ export interface IBaseLocale {
     CARD_STATUS_NEW_HINT: string;
     CARD_STATUS_SEEN: string;
     CARD_STATUS_SEEN_HINT: string;
+    TYPE_ANSWERS: string;
+    TYPED_ANSWER_PLACEHOLDER: string;
     CARD_NOTE_PLACEHOLDER: string;
     CARD_NOTE_EDIT: string;
     CARD_NOTE_EDIT_LINK: string;

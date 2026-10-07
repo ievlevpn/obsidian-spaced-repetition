@@ -5,7 +5,9 @@ import { Deck } from "src/data/data-structures/deck/deck";
 import { DeckStats } from "src/scheduling/flashcard-review-sequencer";
 import DeckInfoComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/deck-info/deck-info";
 import BackButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/back-button";
-import CardMenuButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
+import CardMenuButtonComponent, {
+    TypeAnswersToggle,
+} from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
 import EditButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/edit-button";
 import ResetButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/reset-button";
 import SkipButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/skip-button";
@@ -160,6 +162,12 @@ export default class CardToolbarComponent {
             flashcardCardOrder === "EveryCardRandomDeckAndCard" ||
                 flashcardCardOrder === "DueFirstRandomDeckAndCard",
         );
+    }
+
+    /** Gives both card menus the "Type answers" switch. */
+    public setTypeAnswersToggle(toggle: TypeAnswersToggle): void {
+        this.extendedMenuButton.typeAnswersToggle = toggle;
+        this.shortMenuButton.typeAnswersToggle = toggle;
     }
 
     /**

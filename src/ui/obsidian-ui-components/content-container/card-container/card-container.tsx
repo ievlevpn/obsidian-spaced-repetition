@@ -3,12 +3,18 @@ import moment from "moment";
 import { App, Platform } from "obsidian";
 
 import { CardType } from "src/data/data-structures/card/questions/question";
+import { CardFrontBackUtil } from "src/data/data-structures/card/questions/question-type";
 import { SRSettings } from "src/data/settings";
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
+import {
+    compareTypedAnswer,
+    typedAnswerTarget,
+    TypedComparison,
+} from "src/scheduling/typed-answer";
 import CardCommentComponent, {
     CardCommentInput,
 } from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment";
@@ -17,12 +23,16 @@ import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-cont
 import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
 import {
+    addDiffParts,
+    renderTypedInput,
+    renderTypedResult,
+} from "src/ui/obsidian-ui-components/content-container/card-container/typed-answer/typed-answer";
+import {
     CardState,
     SessionData,
 } from "src/ui/obsidian-ui-components/content-container/content-manager";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
-import { escapeHtml } from "src/utils/escape-html";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
 import { removeCommonIndent } from "src/utils/strings";
@@ -52,6 +62,14 @@ export class CardContainer {
 
     private clozeInputs: NodeListOf<HTMLInputElement> | null = null;
     private clozeAnswers: NodeListOf<Element> | null = null;
+
+    // Typing the answer, switched on from the card menu for the current session. Cloze blanks
+    // become fields; a card with a short plain-text answer gets a field under its question.
+    private typeAnswers: boolean = false;
+    private typedInput: HTMLInputElement | null = null;
+    private typedTarget: string | null = null;
+    // The arguments of the last drawCardFront, so switching typing on redraws the card
+    private frontArgs: { sessionData: SessionData; settings: SRSettings } | null = null;
 
     private processReviewHandler: (response: ReviewResponse) => Promise<void>;
     private skipCardHandler: () => void;
@@ -115,6 +133,10 @@ export class CardContainer {
             () => void this.undoHandler(),
             closeModal,
         );
+        this.toolbar.setTypeAnswersToggle({
+            get: () => this.typeAnswers,
+            set: (on: boolean) => void this.setTypeAnswers(on),
+        });
 
         this.scrollWrapper = this.view.createDiv();
         this.scrollWrapper.addClass("sr-scroll-wrapper");
@@ -246,7 +268,42 @@ export class CardContainer {
         }
     }
 
+    /** Switches typing the answer on or off; a card showing its question is redrawn. */
+    public async setTypeAnswers(on: boolean): Promise<void> {
+        this.typeAnswers = on;
+        if (this.cardState === CardState.Front && this.frontArgs !== null) {
+            await this.drawCardFront(this.frontArgs.sessionData, this.frontArgs.settings);
+        }
+    }
+
+    /** Typing the answer lasts one session: a new review session starts with it off. */
+    public resetTypeAnswers(): void {
+        this.typeAnswers = false;
+    }
+
+    /**
+     * The card's front and back. While typing, a cloze card is expanded again with its blanks as
+     * fields (math clozes keep their LaTeX blanks), so the switch works without re-parsing notes.
+     */
+    private cardSides(
+        sessionData: SessionData,
+        settings: SRSettings,
+    ): { front: string; back: string } {
+        const card = sessionData.cardData.currentCard;
+        const question = sessionData.currentQuestion;
+        if (this.typeAnswers && question.questionType === CardType.Cloze) {
+            const sides = CardFrontBackUtil.expand(
+                CardType.Cloze,
+                question.questionText.actualQuestion,
+                { ...settings, convertClozePatternsToInputs: true },
+            )[card.cardIdx];
+            if (sides) return { front: sides.front, back: sides.back };
+        }
+        return { front: card.front, back: card.back };
+    }
+
     public async drawCardFront(sessionData: SessionData, settings: SRSettings) {
+        this.frontArgs = { sessionData, settings };
         this.toolbar.setResetButtonDisabled(true);
         // Update current deck info
         this.cardState = sessionData.cardData.currentCardState;
@@ -255,6 +312,7 @@ export class CardContainer {
 
         // Update card content
         await this.drawCardFrontContent(sessionData, settings);
+        this.drawTypedInput(sessionData, settings);
         this.cardComment.hide();
 
         // Update response buttons
@@ -271,6 +329,22 @@ export class CardContainer {
                 firstInput.focus();
             }
         }
+    }
+
+    // A field under the question of a non-cloze card whose answer is short plain text
+    private drawTypedInput(sessionData: SessionData, settings: SRSettings): void {
+        this.typedInput = null;
+        this.typedTarget = null;
+        if (!this.typeAnswers || sessionData.currentQuestion.questionType === CardType.Cloze) {
+            return;
+        }
+        this.typedTarget = typedAnswerTarget(this.cardSides(sessionData, settings).back);
+        if (this.typedTarget === null) return;
+        this.typedInput = renderTypedInput(this.content, {
+            onSubmit: () => this.showAnswerHandler(),
+            textDirection: sessionData.currentQuestion.questionText.textDirection,
+        });
+        this.typedInput.focus();
     }
 
     private drawCardContext(sessionData: SessionData, settings: SRSettings) {
@@ -316,7 +390,7 @@ export class CardContainer {
         );
 
         await wrapper.renderMarkdownWrapper(
-            removeCommonIndent(sessionData.cardData.currentCard.front),
+            removeCommonIndent(this.cardSides(sessionData, settings).front),
             this.content,
             sessionData.currentQuestion.questionText.textDirection,
             // sessionData.cardData.currentCardState
@@ -421,41 +495,38 @@ export class CardContainer {
             });
         });
     }
-    private _evaluateClozeAnswers(): void {
+    /**
+     * Marks each typed cloze blank on the back: what was typed, letter by letter, and the expected
+     * answer when they differ.
+     *
+     * @returns Whether every blank was typed exactly, or null when nothing was typed
+     */
+    private _evaluateClozeAnswers(): boolean | null {
         this.clozeAnswers = activeDocument.querySelectorAll(".cloze-answer");
+        if (this.clozeInputs === null || this.clozeAnswers.length !== this.clozeInputs.length) {
+            return null;
+        }
+        const typed: string[] = Array.from(this.clozeInputs).map((input) => input.value);
+        if (typed.every((text) => text.trim() === "")) return null;
 
-        if (this.clozeInputs !== null && this.clozeAnswers.length === this.clozeInputs.length) {
-            for (let i = 0; i < this.clozeAnswers.length; i++) {
-                const clozeInput = this.clozeInputs[i];
-                const clozeAnswer = this.clozeAnswers[i] as HTMLElement;
+        let allExact = true;
+        for (let i = 0; i < this.clozeAnswers.length; i++) {
+            const clozeAnswer = this.clozeAnswers[i] as HTMLElement;
+            const comparison: TypedComparison = compareTypedAnswer(
+                typed[i],
+                clozeAnswer.innerText.trim(),
+                false,
+            );
+            allExact &&= comparison.exact;
 
-                const inputText = clozeInput.value.trim();
-                const answerText = clozeAnswer.innerText.trim();
-
-                clozeAnswer.empty();
-
-                const answerElement = clozeAnswer.createSpan({
-                    text: escapeHtml(inputText),
-                    cls: "cloze-answer",
-                });
-
-                answerElement.setCssProps({
-                    color: inputText === answerText ? "green" : "red",
-                    "text-Decoration": inputText === answerText ? "none" : "line-through",
-                });
-
-                if (inputText !== answerText) {
-                    const span = clozeAnswer.createSpan({
-                        text: escapeHtml(answerText),
-                        cls: "cloze-answer-wrong",
-                    });
-                    span.setCssProps({
-                        color: "green",
-                        "text-decoration": "none",
-                    });
-                }
+            clozeAnswer.empty();
+            clozeAnswer.addClass("sr-typed-cloze");
+            addDiffParts(clozeAnswer.createSpan(), comparison.typed);
+            if (!comparison.exact) {
+                addDiffParts(clozeAnswer.createSpan("sr-typed-expected"), comparison.expected);
             }
         }
+        return allExact;
     }
 
     public async drawBack(
@@ -469,11 +540,27 @@ export class CardContainer {
 
         this.toolbar.setResetButtonDisabled(false);
 
+        // Read the typed answer before the front, and with it the field, is redrawn
+        const typedText: string = this.typedInput?.value ?? "";
+        const typedTarget: string | null = this.typedTarget;
+        this.typedInput = null;
+        this.typedTarget = null;
+        let typedExact: boolean | null = null;
+
         // Show answer text
         if (sessionData.currentQuestion.questionType !== CardType.Cloze) {
             await this.drawCardFrontContent(sessionData, settings);
             const hr: HTMLElement = activeDocument.createElement("hr");
             this.content.appendChild(hr);
+            if (typedTarget !== null && typedText.trim() !== "") {
+                const comparison = compareTypedAnswer(typedText, typedTarget, false);
+                typedExact = comparison.exact;
+                renderTypedResult(
+                    this.content,
+                    comparison,
+                    sessionData.currentQuestion.questionText.textDirection,
+                );
+            }
         } else {
             this.content.empty();
             this.drawCardStatus(sessionData);
@@ -486,14 +573,16 @@ export class CardContainer {
             sessionData.currentNote.filePath,
         );
         await wrapper.renderMarkdownWrapper(
-            removeCommonIndent(sessionData.cardData.currentCard.back),
+            removeCommonIndent(this.cardSides(sessionData, settings).back),
             this.content,
             sessionData.currentQuestion.questionText.textDirection,
             // sessionData.cardData.currentCardState,
         );
 
         // Evaluate cloze answers
-        this._evaluateClozeAnswers();
+        if (sessionData.currentQuestion.questionType === CardType.Cloze) {
+            typedExact = this._evaluateClozeAnswers();
+        }
 
         // The comment box is suppressed for any card that contains a ">" line anywhere.
         //
@@ -527,6 +616,9 @@ export class CardContainer {
             settings.showIntervalInReviewButtons,
             determineButtonSchedule,
         );
+        if (typedExact !== null && reviewMode !== FlashcardReviewMode.Cram) {
+            this.response.setSuggested(typedExact ? ReviewResponse.Good : ReviewResponse.Again);
+        }
         // NEW: restore keyboard focus after cloze confirmation
         if (this.plugin.uiManager === null) throw new Error("UI manager not initialized!!!");
         this.plugin.uiManager.setSRViewInFocus(true);
