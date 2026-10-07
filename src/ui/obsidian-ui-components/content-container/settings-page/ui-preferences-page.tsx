@@ -106,15 +106,11 @@ export class UIPreferencesPage extends SettingsPage {
                 setting
                     .setName(t("PROGRESS_BAR"))
                     .setDesc(t("PROGRESS_BAR_DESC"))
-                    .addDropdown((dropdown) =>
-                        dropdown
-                            .addOption("plain", t("PROGRESS_BAR_PLAIN"))
-                            .addOption("ratings", t("PROGRESS_BAR_RATINGS"))
-                            .addOption("off", t("PROGRESS_BAR_OFF"))
-                            .setValue(this.settingsManager.settings.progressBar)
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(this.settingsManager.settings.showProgressBar)
                             .onChange(async (value) => {
-                                this.settingsManager.settings.progressBar =
-                                    value === "ratings" || value === "off" ? value : "plain";
+                                this.settingsManager.settings.showProgressBar = value;
                                 await this.settingsManager.save();
                             }),
                     );

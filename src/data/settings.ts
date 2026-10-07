@@ -2,7 +2,6 @@ import { StorageType } from "src/data/data-store/base/data-store";
 import { t } from "src/lang/helpers";
 import { SRAlgorithmType } from "src/scheduling/algorithms/base/isr-algorithm";
 import { AnswerKeys } from "src/scheduling/answer-keys";
-import type { ProgressBarStyle } from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/progress-bar/progress-bar";
 import { pathMatchesPattern } from "src/utils/fs";
 
 export interface SRSettings {
@@ -78,8 +77,8 @@ export interface SRSettings {
     // Number keys during review: "original" (1 Hard, 2 Good, 3 Easy, 0 Reset) or "anki" (1 Again,
     // 2 Hard, 3 Good, 4 Easy)
     answerKeys: AnswerKeys;
-    // The thin line under the card toolbar: one colour, coloured by how each card went, or off
-    progressBar: ProgressBarStyle;
+    // The thin progress line under the card toolbar
+    showProgressBar: boolean;
     useCalloutsForSchedulingComments: boolean;
 
     // algorithm
@@ -177,7 +176,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     mobileSwipeToUndo: true,
     useCustomHotkeys: false,
     answerKeys: "original",
-    progressBar: "plain",
+    showProgressBar: true,
     useCalloutsForSchedulingComments: false,
 
     // algorithm

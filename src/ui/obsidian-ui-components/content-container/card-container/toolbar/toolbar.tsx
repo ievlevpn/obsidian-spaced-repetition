@@ -4,9 +4,7 @@ import { Platform } from "obsidian";
 import { Deck } from "src/data/data-structures/deck/deck";
 import { DeckStats } from "src/scheduling/flashcard-review-sequencer";
 import DeckInfoComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/deck-info/deck-info";
-import ProgressBarComponent, {
-    ProgressBarStyle,
-} from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/progress-bar/progress-bar";
+import ProgressBarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/progress-bar/progress-bar";
 import BackButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/back-button";
 import CardMenuButtonComponent, {
     CardMarkerActions,
@@ -157,12 +155,12 @@ export default class CardToolbarComponent {
         totalDecksInSession: number,
         currentDeckTotalCardsInQueue: number,
         flashcardCardOrder: string,
-        progressBarStyle: ProgressBarStyle,
+        showProgressBar: boolean,
     ) {
         this.progressBar.update(
             totalCardsInSession - chosenDeckStats.cardsInQueueCount,
             totalCardsInSession,
-            progressBarStyle,
+            showProgressBar,
         );
         this.infoSection.updateInfo(
             chosenDeck.deckName,
