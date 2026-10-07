@@ -36,6 +36,12 @@ describe("getListContext", () => {
 });
 
 describe("cleanContextLine", () => {
+    test("a \\cloze after a command keeps the two apart", () => {
+        expect(cleanContextLine("- $x \\le\\cloze{c_0}{}$ and $\\cloze{a}{}$")).toBe(
+            "- $x \\le c_0$ and $a$",
+        );
+    });
+
     test("drops schedule comments and comment refs, shows cloze answers", () => {
         expect(
             cleanContextLine("- {{chien;;animal}} = dog [^sr-a3f91c] <!--SR:!2026-01-01,3,250-->"),

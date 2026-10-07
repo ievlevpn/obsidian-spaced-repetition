@@ -6,6 +6,8 @@
 //
 // the card for the second line gets the context ["Faux amis:"].
 
+import { separated } from "src/data/data-structures/card/questions/math-cloze";
+
 const LIST_ITEM = /^(\s*)([-*+]|\d+[.)])\s/;
 
 const indentOf = (line: string): number => line.match(/^\s*/)[0].replace(/\t/g, "    ").length;
@@ -68,6 +70,10 @@ export function cleanContextLine(line: string): string {
         .replace(/<!--SR:.*?-->/g, "")
         .replace(/\[\^sr-[0-9a-f]{6}\]/g, "")
         .replace(/\{\{(?:\d+;;)?(.*?)(?:;;[^}]*)?\}\}/g, "$1")
-        .replace(/\\cloze\s*\{([^{}]*)\}\s*\{[^{}]*\}/g, "$1")
+        .replace(
+            /\\cloze\s*\{([^{}]*)\}\s*\{[^{}]*\}/g,
+            (match: string, answer: string, offset: number, whole: string) =>
+                separated(whole.slice(0, offset), answer, whole.slice(offset + match.length)),
+        )
         .trim();
 }

@@ -77,12 +77,32 @@ export function tokenizeMathClozes(text: string): { text: string; clozes: MathCl
  * @returns The text with every leftover token or key replaced by its answer
  */
 export function restoreMathClozes(text: string, clozes: MathCloze[]): string {
-    const answer = (k: string) => clozes[Number(k)].answer;
     const token = new RegExp(`${OPEN}[^${CLOSE}]*?${KEY}(\\d+)${KEY}[^${CLOSE}]*${CLOSE}`, "g");
     const key = new RegExp(`${KEY}(\\d+)${KEY}`, "g");
-    return text
-        .replace(token, (_, k: string) => answer(k))
-        .replace(key, (_, k: string) => answer(k));
+    const restore = (match: string, k: string, offset: number, whole: string) =>
+        separated(
+            whole.slice(0, offset),
+            clozes[Number(k)].answer,
+            whole.slice(offset + match.length),
+        );
+    return text.replace(token, restore).replace(key, restore);
+}
+
+/**
+ * A cloze's plain answer, ready to stand in for the macro between `before` and `after`.
+ *
+ * A command name ends at the first non-letter, so a bare answer would run into its neighbours:
+ * `\le\cloze{c_0}{}` must become `\le c_0`, not `\lec_0`. A space is added only where a command
+ * would otherwise absorb a letter; spaces inside math change nothing else. A cloze right after
+ * another is still a token when this one is restored, so it counts as a possible letter.
+ */
+export function separated(before: string, answer: string, after: string): string {
+    const endsInCommand = /\\[A-Za-z]+$/;
+    const startsWithLetter = /^[A-Za-z]/;
+    const startsWithLetterOrToken = new RegExp(`^[A-Za-z${OPEN}${KEY}]`);
+    const lead = endsInCommand.test(before) && startsWithLetter.test(answer) ? " " : "";
+    const trail = endsInCommand.test(answer) && startsWithLetterOrToken.test(after) ? " " : "";
+    return lead + answer + trail;
 }
 
 /**

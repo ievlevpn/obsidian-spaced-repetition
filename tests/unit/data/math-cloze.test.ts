@@ -108,6 +108,13 @@ describe("tokenizeMathClozes / restoreMathClozes", () => {
         ["no macro here", "no macro here"],
         ["$\\cloze{a}$", "$a$"], // the hint is optional
         ["$\\cloze x$", "$\\cloze x$"], // malformed: left untouched
+        // A command right before or inside the cloze must not run into the letters next to it
+        ["$x\\le\\cloze{c_0}{}$", "$x\\le c_0$"],
+        ["$\\cloze{\\alpha}{}x$", "$\\alpha x$"],
+        ["$\\le\\cloze{\\alpha}{}x$", "$\\le\\alpha x$"], // a backslash already ends \le
+        ["$\\le\\cloze{2}{}$", "$\\le2$"], // a digit cannot extend a command: no space needed
+        ["$\\cloze{\\alpha}{}^2$", "$\\alpha^2$"],
+        ["$\\cloze{\\alpha}{}\\cloze{x}{}$", "$\\alpha x$"], // two restored clozes side by side
     ])("restoring the tokens of %s gives %s", (text, expected) => {
         const { text: tokenized, clozes } = tokenizeMathClozes(text);
         expect(restoreMathClozes(tokenized, clozes)).toBe(expected);
@@ -312,5 +319,13 @@ describe("\\cloze outside math is plain text", () => {
     test("no card, and containsMathCloze ignores it", () => {
         expect(expand("write \\cloze{a}{b} inside math")).toEqual([]);
         expect(containsMathCloze("write \\cloze{a}{b} inside math")).toBe(false);
+    });
+});
+
+describe("a restored \\cloze next to a command", () => {
+    test("the sibling card keeps \\le and the answer apart", () => {
+        const cards = expand("$|S| \\le\\cloze{c_0}{}(\\varrho + 1)\\cloze{\\sqrt{T}}{}$");
+        expect(cards).toHaveLength(2);
+        expect(cards[1].front).toBe("$|S| \\le c_0(\\varrho + 1){\\color{#2196f3}{[\\ldots]}}$");
     });
 });
