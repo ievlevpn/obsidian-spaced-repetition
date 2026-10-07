@@ -1,0 +1,64 @@
+/* MARK: Progress bar */
+
+/* A 2px line in place of the toolbar's bottom border */
+.sr-card-toolbar {
+    position: relative;
+
+    &.sr-has-progress-bar {
+        border-bottom-color: transparent;
+    }
+}
+
+.sr-card-toolbar > .sr-progress-bar {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 2px;
+    margin: 0;
+    background-color: var(--background-modifier-border);
+
+    &.sr-is-hidden {
+        display: none;
+    }
+}
+
+.sr-progress-fill {
+    display: flex;
+    height: 100%;
+    width: 0;
+    background-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+    transition: width 200ms ease-out;
+
+    &.is-ratings {
+        background-color: transparent;
+    }
+}
+
+.sr-progress-segment {
+    flex-basis: 0;
+    height: 100%;
+
+    &.is-good {
+        background-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
+    }
+
+    &.is-hard {
+        background-color: rgba(var(--color-orange-rgb), 0.65);
+    }
+
+    &.is-again {
+        background-color: rgba(var(--color-red-rgb), 0.65);
+    }
+
+    &.is-other {
+        background-color: var(--text-faint);
+        opacity: 0.5;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .sr-progress-fill {
+        transition: none;
+    }
+}

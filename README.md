@@ -47,6 +47,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   wrong and missing letters, and Good or Again is suggested. Ported from
   [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT).
 - A quiet "new" / "seen" label on each card.
+- A thin progress line under the card toolbar, in one colour or coloured by how each finished card
+  went (Again, Hard, Good); a setting, or off.
 - Important cards: mark a card with `I` or from the card menu (a star shows on it). Review only the
   important cards of a deck from its menu; optionally show them first in every review, and, with
   FSRS, schedule them for a higher retention (settings, _Important cards_).
