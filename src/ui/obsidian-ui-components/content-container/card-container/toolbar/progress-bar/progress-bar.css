@@ -24,37 +24,10 @@
 }
 
 .sr-progress-fill {
-    display: flex;
     height: 100%;
     width: 0;
     background-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
     transition: width 200ms ease-out;
-
-    &.is-ratings {
-        background-color: transparent;
-    }
-}
-
-.sr-progress-segment {
-    flex-basis: 0;
-    height: 100%;
-
-    &.is-good {
-        background-color: color-mix(in srgb, var(--interactive-accent) 60%, transparent);
-    }
-
-    &.is-hard {
-        background-color: rgba(var(--color-orange-rgb), 0.65);
-    }
-
-    &.is-again {
-        background-color: rgba(var(--color-red-rgb), 0.65);
-    }
-
-    &.is-other {
-        background-color: var(--text-faint);
-        opacity: 0.5;
-    }
 }
 
 @media (prefers-reduced-motion: reduce) {

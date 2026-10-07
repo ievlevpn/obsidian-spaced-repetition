@@ -22,7 +22,6 @@ import CardCommentComponent, {
 import ContextSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/context-section/context-section";
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
 import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
-import ProgressBarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/progress-bar/progress-bar";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
 import { CardMarkerActions } from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
 import {
@@ -236,7 +235,6 @@ export class CardContainer {
             return;
         }
 
-        this.toolbar.progressBar.reset();
         await this.drawCardFront(sessionData, settings);
 
         this.view.removeClass("sr-is-hidden");
@@ -510,13 +508,8 @@ export class CardContainer {
             sessionData.totalDecksInSession,
             sessionData.deckData.currentDeckTotalCardsInQueue,
             flashcardCardOrder,
-            this.plugin.dataManager.data.settings.progressBar,
+            this.plugin.dataManager.data.settings.showProgressBar,
         );
-    }
-
-    /** The progress bar's record of how each card went, fed by the content manager. */
-    public get progressBar(): ProgressBarComponent {
-        return this.toolbar.progressBar;
     }
 
     private _setupClozeInputListeners(): void {

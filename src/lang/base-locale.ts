@@ -296,9 +296,6 @@ export interface IBaseLocale {
     USE_CUSTOM_HOTKEYS_DESC: string;
     PROGRESS_BAR: string;
     PROGRESS_BAR_DESC: string;
-    PROGRESS_BAR_PLAIN: string;
-    PROGRESS_BAR_RATINGS: string;
-    PROGRESS_BAR_OFF: string;
     ANSWER_KEYS: string;
     ANSWER_KEYS_DESC: string;
     ANSWER_KEYS_ANKI: string;

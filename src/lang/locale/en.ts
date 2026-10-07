@@ -362,9 +362,6 @@ const en: IBaseLocale = {
     PROGRESS_BAR: "Progress bar",
     PROGRESS_BAR_DESC:
         "A thin line under the card toolbar that fills as the session's cards are done.",
-    PROGRESS_BAR_PLAIN: "One colour",
-    PROGRESS_BAR_RATINGS: "Coloured by how each card went (Again, Hard, Good)",
-    PROGRESS_BAR_OFF: "Off",
     ANSWER_KEYS: "Answer keys",
     ANSWER_KEYS_DESC: "Which number keys answer a card during review.",
     ANSWER_KEYS_ANKI: "Anki (1 Again, 2 Hard, 3 Good, 4 Easy)",

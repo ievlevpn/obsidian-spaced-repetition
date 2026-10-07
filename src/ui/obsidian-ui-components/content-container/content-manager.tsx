@@ -557,7 +557,6 @@ export default class ContentManager {
         if (this.reviewSequencer === null) return;
         this._stageCardComment();
         await this.reviewSequencer.flushPendingCardComment();
-        this.cardContainer.progressBar.noteOther();
         await this.reviewSequencer.suspendCurrentCard();
         new Notice(t("CARD_SUSPENDED"));
         await this._showNextCard();
@@ -567,7 +566,6 @@ export default class ContentManager {
         if (this.reviewSequencer === null) return;
         this._stageCardComment();
         await this.reviewSequencer.flushPendingCardComment();
-        this.cardContainer.progressBar.noteOther();
         this.reviewSequencer.skipCurrentCard();
         await this._showNextCard();
     }
@@ -591,10 +589,7 @@ export default class ContentManager {
         // A comment typed on the card now showing belongs to that card: write it first
         this._stageCardComment();
         await this.reviewSequencer.flushPendingCardComment();
-        if (await this.reviewSequencer.undo()) {
-            this.cardContainer.progressBar.undoRating(this.reviewSequencer.currentCard);
-            await this._showNextCard();
-        }
+        if (await this.reviewSequencer.undo()) await this._showNextCard();
     }
 
     private _displayCurrentCardInfoNotice() {
@@ -617,8 +612,6 @@ export default class ContentManager {
         this.lastPressedOnProcessReview = timeNow;
 
         this._stageCardComment();
-        const ratedCard = this.reviewSequencer.currentCard;
-        if (ratedCard) this.cardContainer.progressBar.noteRating(ratedCard, response);
         await this.reviewSequencer.processReview(response);
         await this._showNextCard();
     }
