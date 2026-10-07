@@ -3,11 +3,10 @@ import { TFile } from "obsidian";
 import { OsrCore } from "src/data/core";
 import { Deck, DeckTreeFilter } from "src/data/data-structures/deck/deck";
 import {
-    DeckOrder,
     DeckTreeIterator,
     IDeckTreeIterator,
     IIteratorOrder,
-    RepItemOrder,
+    iteratorOrderFromNames,
 } from "src/data/data-structures/deck/deck-tree-iterator";
 import { SRSettings } from "src/data/settings";
 import SRPlugin from "src/main";
@@ -127,16 +126,10 @@ export class ReviewQueueLoader {
     }
 
     private createDeckTreeIterator(settings: SRSettings): IDeckTreeIterator {
-        let cardOrder: RepItemOrder =
-            RepItemOrder[settings.flashcardCardOrder as keyof typeof RepItemOrder];
-        if (cardOrder === undefined) cardOrder = RepItemOrder.DueFirstSequential;
-        let deckOrder: DeckOrder = DeckOrder[settings.flashcardDeckOrder as keyof typeof DeckOrder];
-        if (deckOrder === undefined) deckOrder = DeckOrder.PrevDeckComplete_Sequential;
-
-        const iteratorOrder: IIteratorOrder = {
-            deckOrder,
-            repItemOrder: cardOrder,
-        };
+        const iteratorOrder: IIteratorOrder = iteratorOrderFromNames(
+            settings.flashcardCardOrder,
+            settings.flashcardDeckOrder,
+        );
         return new DeckTreeIterator(iteratorOrder, null);
     }
 }

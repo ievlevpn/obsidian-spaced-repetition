@@ -10,7 +10,10 @@ import {
     CardFrontBackUtil,
 } from "src/data/data-structures/card/questions/question-type";
 import { Deck } from "src/data/data-structures/deck/deck";
-import { IDeckTreeIterator } from "src/data/data-structures/deck/deck-tree-iterator";
+import {
+    IDeckTreeIterator,
+    IIteratorOrder,
+} from "src/data/data-structures/deck/deck-tree-iterator";
 import { TopicPath } from "src/data/data-structures/deck/topic-path";
 import { SRSettings } from "src/data/settings";
 import { Note } from "src/note/note";
@@ -33,6 +36,7 @@ export interface IFlashcardReviewSequencer {
 
     setDeckTree(originalDeckTree: Deck, remainingDeckTree: Deck): void;
     setCurrentDeck(topicPath: TopicPath): void;
+    setCardOrder(iteratorOrder: IIteratorOrder): void;
     refreshCurrentDeck(): void;
     getDeckStats(topicPath: TopicPath): DeckStats;
     getSubDecksWithCardsInQueue(deck: Deck): Deck[];
@@ -232,6 +236,11 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this.pendingCards = [];
         this.undoStack = [];
         this.setCurrentDeck(TopicPath.emptyPath);
+    }
+
+    /** Changes the order cards are reviewed in; takes effect from the next setCurrentDeck. */
+    setCardOrder(iteratorOrder: IIteratorOrder): void {
+        this.cardSequencer.setIteratorOrder(iteratorOrder);
     }
 
     setCurrentDeck(topicPath: TopicPath): void {

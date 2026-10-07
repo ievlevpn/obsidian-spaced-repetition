@@ -32,6 +32,22 @@ export enum DeckOrder {
     PrevDeckComplete_Random,
 }
 
+/**
+ * The iterator order named by the settings' card order and deck order, falling back to due first,
+ * sequential for a name that is not known.
+ *
+ * @param cardOrder - A RepItemOrder name, e.g. "NewFirstSequential"
+ * @param deckOrder - A DeckOrder name
+ */
+export function iteratorOrderFromNames(cardOrder: string, deckOrder: string): IIteratorOrder {
+    return {
+        repItemOrder:
+            RepItemOrder[cardOrder as keyof typeof RepItemOrder] ?? RepItemOrder.DueFirstSequential,
+        deckOrder:
+            DeckOrder[deckOrder as keyof typeof DeckOrder] ?? DeckOrder.PrevDeckComplete_Sequential,
+    };
+}
+
 export interface IIteratorOrder {
     // Within a deck this specifies the order the cards should be reviewed
     // e.g. new first, going sequentially
@@ -62,6 +78,11 @@ export interface IDeckTreeIterator {
      * @param {TopicPath} topicPath - The topic path.
      */
     setIteratorTopicPath(topicPath: TopicPath): void;
+
+    /**
+     * Changes the order cards are drawn in; takes effect from the next setIteratorTopicPath.
+     */
+    setIteratorOrder(iteratorOrder: IIteratorOrder): void;
     /**
      * Deletes the current repetition item from all decks.
      *
@@ -331,6 +352,11 @@ export class DeckTreeIterator implements IDeckTreeIterator {
     setBaseDeck(baseDeck: Deck | null): void {
         this.baseDeckTree = baseDeck;
         this.singleDeckIterator.setNoCurrentCard();
+    }
+
+    setIteratorOrder(iteratorOrder: IIteratorOrder): void {
+        this.iteratorOrder = iteratorOrder;
+        this.singleDeckIterator = new SingleDeckIterator(iteratorOrder);
     }
 
     setIteratorTopicPath(topicPath: TopicPath): void {
