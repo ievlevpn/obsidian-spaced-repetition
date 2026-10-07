@@ -211,3 +211,36 @@ describe("inlineClozeLines keeps tables and callouts together", () => {
         ]);
     });
 });
+
+describe("A card never ends on a heading", () => {
+    test("a heading right above the inline card that closes a region card is left out", () => {
+        const text =
+            "---\n- En vous remerciant {{de}} votre compréhension.\n\n#### Formules finales\n- Yours sincerely ::: Cordialement\n---";
+        expect(cardsOf(text)).toEqual([
+            [CardType.Cloze, "- En vous remerciant {{de}} votre compréhension.", 1, 1],
+            [CardType.SingleLineBasic, "- Yours sincerely ::: Cordialement", 4, 4],
+        ]);
+    });
+
+    test("trailing headings and blank lines before --- are left out", () => {
+        const text = "---\nText {{a}}\n\n## Next section\n\n---";
+        expect(cardsOf(text)).toEqual([[CardType.Cloze, "Text {{a}}", 1, 1]]);
+    });
+
+    test("a heading glued under the last card at the end of the note is left out", () => {
+        const text = "Text {{a}}\n> a quote\n# Footnotes";
+        expect(cardsOf(text, blankLineMode)).toEqual([
+            [CardType.Cloze, "Text {{a}}\n> a quote", 0, 1],
+        ]);
+    });
+
+    test("a heading with a cloze is content and stays", () => {
+        const text = "---\nIntro\n## The {{answer}}\n---";
+        expect(cardsOf(text)).toEqual([[CardType.Cloze, "Intro\n## The {{answer}}", 1, 2]]);
+    });
+
+    test("headings inside the card are kept", () => {
+        const text = "---\nText {{a}}\n### Sub\nmore\n---";
+        expect(cardsOf(text)).toEqual([[CardType.Cloze, "Text {{a}}\n### Sub\nmore", 1, 3]]);
+    });
+});
