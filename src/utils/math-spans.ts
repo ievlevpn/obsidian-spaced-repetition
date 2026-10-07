@@ -26,6 +26,8 @@ export interface MathSpan {
  */
 export function findMathSpans(text: string): MathSpan[] {
     const spans: MathSpan[] = [];
+    // Every span starts and ends with a `$`: text without one has none (most language cards)
+    if (!text.includes("$")) return spans;
     let fence: string | null = null; // the opening fence run while inside a fenced code block
     let displayStart = -1; // start of an open $$ span, or -1
 
@@ -37,7 +39,8 @@ export function findMathSpans(text: string): MathSpan[] {
                 fence = null;
         } else if (displayStart < 0 && fenceMatch) {
             fence = fenceMatch[1];
-        } else {
+        } else if (line.includes("$")) {
+            // A line without `$` can neither open nor close a span, inline or display
             displayStart = scanLine(line, offset, displayStart, spans);
         }
         offset += line.length + 1;
