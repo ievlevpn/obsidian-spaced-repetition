@@ -66,6 +66,13 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   Past notes can be edited or deleted, saved right away (`Ctrl/Cmd+Enter`), and long histories
   are folded.
 
+**Performance**
+
+- Parsed notes are kept between syncs and reused while their file is unchanged, so opening a
+  review re-reads only the notes that changed instead of every flashcard note (cleared on any
+  settings change and each new day). Page ranks for the note review queue are reused while the
+  links between notes are unchanged, and math detection skips text without a `$`.
+
 **Unmerged upstream fixes**, ported with credit to their authors:
 
 - [#1587](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1587) by Lorite: notes are
