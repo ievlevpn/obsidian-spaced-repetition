@@ -104,31 +104,32 @@ export interface TypedComparison {
  * Which characters of `a` and of `b` are in their longest common subsequence.
  */
 function commonCharacters(a: string[], b: string[]): { inA: boolean[]; inB: boolean[] } {
+    // lcs[i][j]: length of the longest common subsequence of a[i..] and b[j..]
     const lcs: number[][] = Array.from({ length: a.length + 1 }, () =>
         new Array<number>(b.length + 1).fill(0),
     );
-    for (let i = 1; i <= a.length; i++) {
-        for (let j = 1; j <= b.length; j++) {
+    for (let i = a.length - 1; i >= 0; i--) {
+        for (let j = b.length - 1; j >= 0; j--) {
             lcs[i][j] =
-                a[i - 1] === b[j - 1]
-                    ? lcs[i - 1][j - 1] + 1
-                    : Math.max(lcs[i - 1][j], lcs[i][j - 1]);
+                a[i] === b[j] ? lcs[i + 1][j + 1] + 1 : Math.max(lcs[i + 1][j], lcs[i][j + 1]);
         }
     }
+    // Walk forwards, so that among equally long matches the earliest one wins: "print" against
+    // "prints; imprints" matches the first word, not the "print" inside "imprints"
     const inA = new Array<boolean>(a.length).fill(false);
     const inB = new Array<boolean>(b.length).fill(false);
-    let i = a.length;
-    let j = b.length;
-    while (i > 0 && j > 0) {
-        if (a[i - 1] === b[j - 1]) {
-            inA[i - 1] = true;
-            inB[j - 1] = true;
-            i--;
-            j--;
-        } else if (lcs[i - 1][j] >= lcs[i][j - 1]) {
-            i--;
+    let i = 0;
+    let j = 0;
+    while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) {
+            inA[i] = true;
+            inB[j] = true;
+            i++;
+            j++;
+        } else if (lcs[i][j + 1] >= lcs[i + 1][j]) {
+            j++;
         } else {
-            j--;
+            i++;
         }
     }
     return { inA, inB };

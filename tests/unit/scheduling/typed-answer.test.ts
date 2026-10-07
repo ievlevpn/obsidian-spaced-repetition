@@ -160,3 +160,14 @@ describe("compareTypedAnswer: more", () => {
         expect(r.typed).toEqual([{ kind: "wrong", text: "İ" }]);
     });
 });
+
+describe("compareTypedAnswer: alignment", () => {
+    test("among equally good matches the earliest wins", () => {
+        const r = compareTypedAnswer("print", "prints; imprints", false);
+        expect(r.typed).toEqual([{ kind: "ok", text: "print" }]);
+        expect(r.expected).toEqual([
+            { kind: "ok", text: "print" },
+            { kind: "missing", text: "s; imprints" },
+        ]);
+    });
+});
