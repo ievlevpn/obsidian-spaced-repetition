@@ -58,6 +58,9 @@ export interface IBaseLocale {
     CARD_NOTE_HIDE_BOX: string;
     CARD_NOTE_ADD: string;
     CARD_NOTE_SAVE: string;
+    CARD_NOTE_DRAFT: string;
+    CARD_NOTE_SHEET_TITLE: string;
+    CARD_NOTE_SEND: string;
     CARD_NOTE_SAVE_HINT: string;
     CARD_NOTE_SHOW_EARLIER: string;
     CARD_NOTE_SHOW_EARLIER_ONE: string;
