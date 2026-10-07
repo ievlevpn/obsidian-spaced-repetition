@@ -1,8 +1,11 @@
+/* Set apart from the answer by a divider, and aligned with the card's text */
 .sr-card-comment {
     display: flex;
     flex-direction: column;
-    gap: var(--size-2-2);
-    padding: 0 var(--size-4-3) var(--size-4-2) var(--size-4-3);
+    gap: var(--size-4-2);
+    margin-top: var(--size-4-2);
+    padding: var(--size-4-3) var(--internal-side-padding) var(--size-4-2);
+    border-top: 1px solid var(--background-modifier-border);
     /* A column-flex sibling of the scrolling content: never let it be compressed away when
        vertical space is tight, which is the common case on a phone. */
     flex-shrink: 0;
@@ -13,20 +16,26 @@
     display: none;
 }
 
+/* Past notes: a quiet panel, date in its own column */
 .sr-card-comment-past {
     display: flex;
     flex-direction: column;
-    gap: var(--size-2-1);
-    font-size: var(--font-ui-smaller);
+    gap: var(--size-4-1);
+    font-size: var(--font-ui-small);
     color: var(--text-muted);
-    border-left: 2px solid var(--background-modifier-border);
-    padding-left: var(--size-4-2);
+    background-color: var(--background-secondary);
+    border-radius: var(--radius-m);
+    padding: var(--size-4-2) var(--size-4-3);
+
+    &:empty {
+        display: none;
+    }
 }
 
 .sr-card-comment-entry {
     display: flex;
-    gap: var(--size-4-1);
-    align-items: flex-start;
+    gap: var(--size-4-3);
+    align-items: baseline;
 
     &.is-being-edited {
         opacity: 0.5;
@@ -121,6 +130,7 @@
 
 .sr-card-comment-date {
     flex-shrink: 0;
+    font-size: var(--font-ui-smaller);
     font-variant-numeric: tabular-nums;
     color: var(--text-faint);
 }
@@ -153,9 +163,15 @@
         overflow-y: auto;
     }
 
+    /* about two and a half lines, so there is room to write without it feeling cramped; while
+       empty and not in use, a single line */
     & .markdown-source-view.mod-cm6 .cm-content {
-        /* about two and a half lines, so there is room to write without it feeling cramped */
         min-height: 4em;
+        transition: min-height 120ms ease-out;
+    }
+
+    &.is-empty:not(:focus-within) .markdown-source-view.mod-cm6 .cm-content {
+        min-height: 1.5em;
     }
 
     &:focus-within {
