@@ -142,6 +142,9 @@ export function removeCommonIndent(text: string): string {
 // e.g. for calls to getQuestionContext(cardLine: number)
 //
 export function splitNoteIntoFrontmatterAndContent(str: string): [string, string] {
+    // Fast path for "\n" line endings: find the closing "---" directly instead of splitting and
+    // rejoining the whole note (three passes over every note on each sync). Same result as below.
+    if (!str.includes("\r")) return splitFrontmatterLf(str);
     const lines = splitTextIntoLineArray(str);
     let lineIndex = 0;
     let hasFrontmatter = false;
@@ -168,6 +171,33 @@ export function splitNoteIntoFrontmatterAndContent(str: string): [string, string
     const emptyLines: string[] = lineIndex > 0 ? Array(lineIndex).join(".").split(".") : [];
     const content: string = emptyLines.concat(lines.slice(lineIndex)).join("\n");
 
+    return [frontmatter, content];
+}
+
+// splitNoteIntoFrontmatterAndContent for text without "\r"
+function splitFrontmatterLf(str: string): [string, string] {
+    // Frontmatter needs "---" as the first line, closed by a later line that is exactly "---"
+    if (!str.startsWith("---\n")) return ["", str];
+    let end: number = -1;
+    for (let p = str.indexOf("\n---", 3); p !== -1; p = str.indexOf("\n---", p + 1)) {
+        const after: number = p + 4;
+        if (after === str.length || str[after] === "\n") {
+            end = after;
+            break;
+        }
+    }
+    if (end === -1) return ["", str];
+
+    // The content keeps the frontmatter's lines, as empty lines, so line numbers stay the same
+    const frontmatter: string = str.slice(0, end);
+    let lineCount: number = 1;
+    for (let i = frontmatter.indexOf("\n"); i !== -1; i = frontmatter.indexOf("\n", i + 1)) {
+        lineCount++;
+    }
+    const content: string =
+        end === str.length
+            ? "\n".repeat(lineCount - 1)
+            : "\n".repeat(lineCount) + str.slice(end + 1);
     return [frontmatter, content];
 }
 
