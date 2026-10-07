@@ -113,26 +113,9 @@ body:not(.is-mobile)
     content: "Space";
 }
 
+/* The number key of each rating, which depends on the "Answer keys" setting */
 body:not(.is-mobile)
     .sr-card-container:not(.sr-custom-hotkeys)
-    .sr-response-button.sr-again-button::after {
-    content: "0";
-}
-
-body:not(.is-mobile)
-    .sr-card-container:not(.sr-custom-hotkeys)
-    .sr-response-button.sr-hard-button::after {
-    content: "1";
-}
-
-body:not(.is-mobile)
-    .sr-card-container:not(.sr-custom-hotkeys)
-    .sr-response-button.sr-good-button::after {
-    content: "2";
-}
-
-body:not(.is-mobile)
-    .sr-card-container:not(.sr-custom-hotkeys)
-    .sr-response-button.sr-easy-button::after {
-    content: "3";
+    .sr-response-button[data-key]::after {
+    content: attr(data-key);
 }

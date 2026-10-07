@@ -617,6 +617,7 @@ export class CardContainer {
             settings.showIntervalInReviewButtons,
             determineButtonSchedule,
         );
+        this.response.setKeyHints(settings.answerKeys);
         if (typedExact !== null && reviewMode !== FlashcardReviewMode.Cram) {
             this.response.setSuggested(typedExact ? ReviewResponse.Good : ReviewResponse.Again);
         }

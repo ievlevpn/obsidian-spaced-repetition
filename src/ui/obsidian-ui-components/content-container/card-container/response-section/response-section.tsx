@@ -6,6 +6,7 @@ import { t } from "src/lang/helpers";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
 import { formatScheduleInterval } from "src/scheduling/algorithms/schedule-display";
+import { AnswerKeys, responseForDigit } from "src/scheduling/answer-keys";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
 import SRResponseButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/sr-response-button";
 import EmulatedPlatform from "src/utils/platform-detector";
@@ -79,6 +80,23 @@ export default class ResponseSectionComponent {
         this.hardButton.buttonEl.addClass("sr-is-hidden");
         this.goodButton.buttonEl.addClass("sr-is-hidden");
         this.easyButton.buttonEl.addClass("sr-is-hidden");
+    }
+
+    /** Labels each rating button with the number key that gives it in this layout. */
+    public setKeyHints(answerKeys: AnswerKeys) {
+        const buttons: [ReviewResponse, SRResponseButtonComponent][] = [
+            [ReviewResponse.Again, this.againButton],
+            [ReviewResponse.Hard, this.hardButton],
+            [ReviewResponse.Good, this.goodButton],
+            [ReviewResponse.Easy, this.easyButton],
+        ];
+        for (const [response, button] of buttons) {
+            const key: number | undefined = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].find(
+                (digit) => responseForDigit(answerKeys, digit) === response,
+            );
+            if (key === undefined) button.buttonEl.removeAttribute("data-key");
+            else button.buttonEl.setAttribute("data-key", String(key));
+        }
     }
 
     /**
