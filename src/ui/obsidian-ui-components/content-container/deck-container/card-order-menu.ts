@@ -16,6 +16,15 @@ const CARD_ORDERS: [string, keyof IBaseLocale][] = [
     ["DueFirstRandomDeckAndCard", "ORDER_DUE_FIRST_RANDOM_ALL"],
 ];
 
+/**
+ * How a deck is reviewed when started from its menu: in another card order, or only its important
+ * cards. A plain click passes none.
+ */
+export interface DeckReviewOptions {
+    cardOrder?: string;
+    importantOnly?: boolean;
+}
+
 // How long a finger rests on a row before the menu opens, and how far it may drift meanwhile
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP_PX = 10;
@@ -30,16 +39,23 @@ const LONG_PRESS_SLOP_PX = 10;
 export function showCardOrderMenu(
     position: { x: number; y: number },
     defaultOrder: string,
-    onPick: (cardOrder: string) => void,
+    onPick: (options: DeckReviewOptions) => void,
 ): void {
     const menu = new Menu();
+    menu.addItem((item) =>
+        item
+            .setTitle(t("REVIEW_IMPORTANT_CARDS"))
+            .setIcon("star")
+            .onClick(() => onPick({ importantOnly: true })),
+    );
+    menu.addSeparator();
     menu.addItem((item) => item.setTitle(t("REVIEW_IN_ORDER")).setIsLabel(true));
     for (const [order, label] of CARD_ORDERS) {
         menu.addItem((item) =>
             item
                 .setTitle(t(label))
                 .setChecked(order === defaultOrder)
-                .onClick(() => onPick(order)),
+                .onClick(() => onPick({ cardOrder: order })),
         );
     }
     menu.showAtPosition(position);

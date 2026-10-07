@@ -23,6 +23,7 @@ import ContextSectionComponent from "src/ui/obsidian-ui-components/content-conta
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
 import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
+import { CardMarkerActions } from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
 import {
     addDiffParts,
     renderTypedInput,
@@ -69,6 +70,8 @@ export class CardContainer {
     private typeAnswers: boolean = false;
     private typedInput: HTMLInputElement | null = null;
     private typedTarget: string | null = null;
+    // The card menu's "Important" and "Suspend card", also behind the I key
+    private markerActions: CardMarkerActions | null = null;
     // The arguments of the last drawCardFront, so switching typing on redraws the card
     private frontArgs: { sessionData: SessionData; settings: SRSettings } | null = null;
 
@@ -277,6 +280,20 @@ export class CardContainer {
         }
     }
 
+    /** Wires the card menu's "Important" and "Suspend card" items, and the I key. */
+    public setMarkerActions(actions: CardMarkerActions): void {
+        this.markerActions = actions;
+        this.toolbar.setMarkerActions(actions);
+    }
+
+    /** Redraws the "new" / "seen" label, e.g. after the card was marked important. */
+    public refreshCardStatus(sessionData: SessionData): void {
+        const old: Element | null = this.content.querySelector(".sr-card-status");
+        if (old === null) return;
+        const fresh: HTMLElement | null = this.buildCardStatus(sessionData);
+        if (fresh) old.replaceWith(fresh);
+    }
+
     /** Typing the answer lasts one session: a new review session starts with it off. */
     public resetTypeAnswers(): void {
         this.typeAnswers = false;
@@ -364,14 +381,26 @@ export class CardContainer {
      * flows around it): whether the card has been rated before, i.e. has a schedule.
      */
     private drawCardStatus(sessionData: SessionData): void {
+        const label: HTMLElement | null = this.buildCardStatus(sessionData);
+        if (label) this.content.appendChild(label);
+    }
+
+    // The label, with a star in front for an important card
+    private buildCardStatus(sessionData: SessionData): HTMLElement | null {
         const card = sessionData.cardData.currentCard;
-        if (!card) return;
+        if (!card) return null;
         const seen: boolean = card.hasSchedule;
-        const label = this.content.createDiv({
+        const label: HTMLElement = createDiv({
             cls: ["sr-card-status", seen ? "is-seen" : "is-new"],
-            text: seen ? t("CARD_STATUS_SEEN") : t("CARD_STATUS_NEW"),
         });
-        label.ariaLabel = seen ? t("CARD_STATUS_SEEN_HINT") : t("CARD_STATUS_NEW_HINT");
+        if (card.markers.important) {
+            label.createSpan({ cls: "sr-card-important", text: "★ " });
+        }
+        label.appendText(seen ? t("CARD_STATUS_SEEN") : t("CARD_STATUS_NEW"));
+        label.ariaLabel =
+            (card.markers.important ? t("CARD_STATUS_IMPORTANT_HINT") + " " : "") +
+            (seen ? t("CARD_STATUS_SEEN_HINT") : t("CARD_STATUS_NEW_HINT"));
+        return label;
     }
 
     private async drawCardFrontContent(sessionData: SessionData, settings: SRSettings) {
@@ -662,6 +691,11 @@ export class CardContainer {
                 break;
             case "KeyU":
                 void this.undoHandler();
+                consumeKeyEvent();
+                break;
+            case "KeyI":
+                if (this.markerActions === null) break;
+                this.markerActions.toggleImportant();
                 consumeKeyEvent();
                 break;
             case "Enter":

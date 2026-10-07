@@ -41,6 +41,8 @@ export interface IFlashcardReviewSequencer {
     getDeckStats(topicPath: TopicPath): DeckStats;
     getSubDecksWithCardsInQueue(deck: Deck): Deck[];
     skipCurrentCard(): void;
+    toggleCurrentCardImportant(): Promise<boolean>;
+    suspendCurrentCard(): Promise<void>;
     get canUndo(): boolean;
     undo(): Promise<boolean>;
     determineCardSchedule(response: ReviewResponse, card: Card): RepItemScheduleInfo;
@@ -326,6 +328,34 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this.cardSequencer.deleteCurrentQuestionFromAllDecks();
     }
 
+    /**
+     * Marks the current card important, or no longer important, and writes that to the note.
+     *
+     * @returns Whether the card is now important
+     */
+    async toggleCurrentCardImportant(): Promise<boolean> {
+        const card: Card | null = this.currentCard;
+        if (card === null) return false;
+        card.markers.important = !card.markers.important;
+        await DataStore.getInstance().writeSchedule(this.currentQuestion);
+        return card.markers.important;
+    }
+
+    /**
+     * Suspends the current card: written to the note, so it is left out of every review until
+     * unsuspended, and taken out of this session, which moves on to the next card.
+     */
+    async suspendCurrentCard(): Promise<void> {
+        const card: Card | null = this.currentCard;
+        if (card === null) return;
+        card.markers.suspended = true;
+        await DataStore.getInstance().writeSchedule(this.currentQuestion);
+        // Undoing an earlier answer would put the deck lists back with this card in them
+        this.undoStack = [];
+        this._originalDeckTree.deleteCardFromAllDecks(card, false);
+        this.cardSequencer.deleteCurrentRepItemFromAllDecks();
+    }
+
     get canUndo(): boolean {
         return this.undoStack.length > 0;
     }
@@ -603,6 +633,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
                     response,
                     card.scheduleInfo,
                     this.dueDateFlashcardHistogram,
+                    card.markers.important,
                 );
             } else {
                 const currentNote: Note = card.question.note;
@@ -610,6 +641,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
                     response,
                     currentNote.filePath,
                     this.dueDateFlashcardHistogram,
+                    card.markers.important,
                 );
             }
         }

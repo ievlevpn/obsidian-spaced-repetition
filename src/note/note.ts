@@ -1,3 +1,4 @@
+import { Card } from "src/data/data-structures/card/card";
 import { Question } from "src/data/data-structures/card/questions/question";
 import { Deck } from "src/data/data-structures/deck/deck";
 import { ISRNoteTFile } from "src/data/data-structures/file/note-file";
@@ -21,10 +22,15 @@ export class Note {
         questionList.forEach((question) => (question.note = this));
     }
 
-    appendCardsToDeck(deck: Deck): void {
+    /**
+     * Adds the note's cards to the deck tree. Suspended cards are left out of every deck; they
+     * go to `suspended` instead, when given.
+     */
+    appendCardsToDeck(deck: Deck, suspended?: Card[]): void {
         for (const question of this.questionList) {
             for (const card of question.cards) {
-                deck.appendRepItem(question.topicPathList, card);
+                if (card.markers.suspended) suspended?.push(card);
+                else deck.appendRepItem(question.topicPathList, card);
             }
         }
     }

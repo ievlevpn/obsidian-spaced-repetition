@@ -837,6 +837,7 @@ Q3::A3`;
         expect(iteratorOrderFromNames("nonsense", "nonsense")).toEqual({
             repItemOrder: RepItemOrder.DueFirstSequential,
             deckOrder: DeckOrder.PrevDeckComplete_Sequential,
+            importantFirst: false,
         });
     });
 });

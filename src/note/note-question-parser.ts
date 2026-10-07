@@ -1,5 +1,6 @@
 import { TagCache } from "obsidian";
 
+import { CardMarkers, parseCardMarkers } from "src/data/card-markers";
 import { DataStore } from "src/data/data-store/base/data-store";
 import { RepItemStorageInfo } from "src/data/data-store/base/rep-item-storage-info";
 import { Card } from "src/data/data-structures/card/card";
@@ -150,7 +151,11 @@ export class NoteQuestionParser {
             }
 
             // Create the list of card objects, and attach to the question
-            const cardList: Card[] = this.createCardList(cardFrontBackList, cardScheduleInfoList);
+            const cardList: Card[] = this.createCardList(
+                cardFrontBackList,
+                cardScheduleInfoList,
+                parseCardMarkers(question.questionText.original),
+            );
             question.setCardList(cardList);
             result.push(question);
         }
@@ -196,6 +201,7 @@ export class NoteQuestionParser {
     private createCardList(
         cardFrontBackList: CardFrontBack[],
         cardScheduleInfoList: RepItemScheduleInfo[],
+        cardMarkersList: CardMarkers[],
     ): Card[] {
         const siblings: Card[] = [];
 
@@ -213,6 +219,7 @@ export class NoteQuestionParser {
             });
 
             cardObj.scheduleInfo = hasScheduleInfo ? schedule : null;
+            if (i < cardMarkersList.length) cardObj.markers = cardMarkersList[i];
 
             siblings.push(cardObj);
         }

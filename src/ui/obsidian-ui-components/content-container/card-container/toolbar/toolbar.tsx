@@ -6,6 +6,7 @@ import { DeckStats } from "src/scheduling/flashcard-review-sequencer";
 import DeckInfoComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/deck-info/deck-info";
 import BackButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/back-button";
 import CardMenuButtonComponent, {
+    CardMarkerActions,
     TypeAnswersToggle,
 } from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
 import EditButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/edit-button";
@@ -162,6 +163,12 @@ export default class CardToolbarComponent {
             flashcardCardOrder === "EveryCardRandomDeckAndCard" ||
                 flashcardCardOrder === "DueFirstRandomDeckAndCard",
         );
+    }
+
+    /** Gives both card menus the "Important" and "Suspend card" items. */
+    public setMarkerActions(actions: CardMarkerActions): void {
+        this.extendedMenuButton.markerActions = actions;
+        this.shortMenuButton.markerActions = actions;
     }
 
     /** Gives both card menus the "Type answers" switch. */

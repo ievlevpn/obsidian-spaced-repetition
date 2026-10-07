@@ -8,6 +8,7 @@ import {
     FlashcardReviewMode,
     IFlashcardReviewSequencer as IFlashcardReviewSequencer,
 } from "src/scheduling/flashcard-review-sequencer";
+import { DeckReviewOptions } from "src/ui/obsidian-ui-components/content-container/deck-container/card-order-menu";
 import DeckListComponent from "src/ui/obsidian-ui-components/content-container/deck-container/deck-list";
 import DeckListHeaderComponent from "src/ui/obsidian-ui-components/content-container/deck-container/deck-list-header";
 
@@ -19,7 +20,8 @@ export class DeckContainer {
     constructor(
         parentEl: HTMLElement,
         changeReviewMode: (reviewMode: FlashcardReviewMode) => void,
-        startReviewOfDeck: (deck: Deck, cardOrder?: string) => void,
+        startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void,
+        showSuspendedCards: () => void,
         closeModal?: () => void,
     ) {
         // Build ui
@@ -29,6 +31,7 @@ export class DeckContainer {
         this.deckListHeader = new DeckListHeaderComponent(
             this.containerEl,
             changeReviewMode,
+            showSuspendedCards,
             closeModal,
         );
 

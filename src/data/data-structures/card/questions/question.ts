@@ -1,3 +1,4 @@
+import { hasCardMarkers } from "src/data/card-markers";
 import {
     OBSIDIAN_BLOCK_ID_ENDOFLINE_REGEX,
     OBSIDIAN_TAG_AT_STARTOFLINE_REGEX,
@@ -408,7 +409,10 @@ export class Question {
         const ref: string = this.questionText.cardCommentRef
             ? formatCardCommentRef(this.questionText.cardCommentRef)
             : "";
-        const hasSchedule: boolean = this.cards.some((card) => card.hasSchedule);
+        // A card with markers (suspended, important) needs the comment even before its first review
+        const hasSchedule: boolean = this.cards.some(
+            (card) => card.hasSchedule || hasCardMarkers(card.markers),
+        );
         if (hasSchedule) {
             result = result.trimEnd();
 
