@@ -47,6 +47,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   wrong and missing letters, and Good or Again is suggested. Ported from
   [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT).
 - A quiet "new" / "seen" label on each card.
+- Answer keys: the original layout (1 Hard, 2 Good, 3 Easy, 0 Reset) or Anki's (1 Again, 2 Hard,
+  3 Good, 4 Easy), chosen in the settings. Ported from Flashcard Studio.
 - The edit card window uses the same embedded Obsidian editor as card notes.
 
 **Card notes**

@@ -332,6 +332,10 @@ const en: IBaseLocale = {
         "Enable custom hotkeys for the review cards commands. The default hotkeys wont be active after enabling this. Custom hotkeys can only be used when using the 'Open in new tab' option.",
 
     // sidebar.ts
+    ANSWER_KEYS: "Answer keys",
+    ANSWER_KEYS_DESC: "Which number keys answer a card during review.",
+    ANSWER_KEYS_ANKI: "Anki (1 Again, 2 Hard, 3 Good, 4 Easy)",
+    ANSWER_KEYS_ORIGINAL: "Original (1 Hard, 2 Good, 3 Easy, 0 Reset)",
     NOTES_REVIEW_QUEUE: "Notes Review Queue",
     CLOSE: "Close",
     NEW: "New",
