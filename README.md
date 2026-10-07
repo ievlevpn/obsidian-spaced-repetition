@@ -20,6 +20,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   Submitted upstream as [#1584](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1584).
 - Inside math, braces belong to LaTeX: `{{...}}` there is never a cloze. `\cloze` outside math is
   plain text.
+- A `\cloze` shown as its answer (on a sibling card) no longer runs into a command next to it:
+  `\le\cloze{c_0}{}` gives `\le c_0`, not `\lec_0`.
 
 **Card format** (with the end marker set to `---`)
 
@@ -35,9 +37,17 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 
 - Undo: go back to the previous card after an answer or skip (button, or `U`), restoring its
   schedule in the note.
-- Mobile: swipe left from the right edge to skip, with visual feedback (toggle in a new
-  _Mobile_ settings page); Skip stays visible in the phone toolbar.
-- A "due first, then random" card order.
+- Mobile: swipe left from the right edge to skip and right from the left edge to go back, with
+  visual feedback (toggles in a new _Mobile_ settings page); Skip stays visible in the phone
+  toolbar.
+- A "due first, then random" card order, and a menu on each deck (right-click, or long-press on a
+  phone) to review it in another card order for one session.
+- Type the answer: switched on per session from the card menu. A card with a short plain-text
+  answer gets a field, and text cloze blanks become fields (math clozes do not). The back marks
+  wrong and missing letters, and Good or Again is suggested. Ported from
+  [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT).
+- A quiet "new" / "seen" label on each card.
+- The edit card window uses the same embedded Obsidian editor as card notes.
 
 **Card notes**
 
@@ -46,6 +56,17 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 - The note box is a real Obsidian editor (live preview, editor plugins such as latex-suite).
   Past notes can be edited or deleted, saved right away (`Ctrl/Cmd+Enter`), and long histories
   are folded.
+
+**Unmerged upstream fixes**, ported with credit to their authors:
+
+- [#1587](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1587) by Lorite: notes are
+  parsed from Obsidian's cache, not re-read from disk on every review.
+- [#1610](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1610) by Kian Kyars: FSRS
+  settings apply without a reload, FSRS placeholders for unreviewed siblings, due-date stats.
+- [#1629](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1629) by mayuriphad: a new
+  card answered Again comes back in the same session.
+- [#1601](https://github.com/st3v3nmw/obsidian-spaced-repetition/pull/1601) by Gwyndolin:
+  short-term FSRS cards are requeued on time.
 
 **Fork housekeeping**
 
