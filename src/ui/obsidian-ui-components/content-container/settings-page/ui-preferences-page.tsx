@@ -104,6 +104,22 @@ export class UIPreferencesPage extends SettingsPage {
             })
             .addSetting((setting: Setting) => {
                 setting
+                    .setName(t("ANSWER_KEYS"))
+                    .setDesc(t("ANSWER_KEYS_DESC"))
+                    .addDropdown((dropdown) =>
+                        dropdown
+                            .addOption("original", t("ANSWER_KEYS_ORIGINAL"))
+                            .addOption("anki", t("ANSWER_KEYS_ANKI"))
+                            .setValue(this.settingsManager.settings.answerKeys)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.answerKeys =
+                                    value === "anki" ? "anki" : "original";
+                                await this.settingsManager.save();
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
                     .setName(t("ENABLE_FILE_MENU_REVIEW_OPTIONS"))
                     .setDesc(t("ENABLE_FILE_MENU_REVIEW_OPTIONS_DESC"))
                     .addToggle((toggle) =>

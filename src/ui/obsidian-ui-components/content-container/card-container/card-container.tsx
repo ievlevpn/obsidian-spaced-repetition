@@ -9,6 +9,7 @@ import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
+import { digitFromKeyCode, responseForDigit } from "src/scheduling/answer-keys";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
 import {
     compareTypedAnswer,
@@ -673,40 +674,19 @@ export class CardContainer {
                     consumeKeyEvent();
                 }
                 break;
-            case "Numpad1":
-            case "Digit1":
-                if (this.cardState !== CardState.Back) {
-                    break;
-                }
-                void this.processReviewHandler(ReviewResponse.Hard);
+            default: {
+                // Number keys answer the card, in the layout chosen in the settings
+                const digit: number | null = digitFromKeyCode(e.code);
+                if (digit === null || this.cardState !== CardState.Back) break;
+                const response: ReviewResponse | null = responseForDigit(
+                    this.plugin.dataManager.data.settings.answerKeys,
+                    digit,
+                );
+                if (response === null) break;
+                void this.processReviewHandler(response);
                 consumeKeyEvent();
                 break;
-            case "Numpad2":
-            case "Digit2":
-                if (this.cardState !== CardState.Back) {
-                    break;
-                }
-                void this.processReviewHandler(ReviewResponse.Good);
-                consumeKeyEvent();
-                break;
-            case "Numpad3":
-            case "Digit3":
-                if (this.cardState !== CardState.Back) {
-                    break;
-                }
-                void this.processReviewHandler(ReviewResponse.Easy);
-                consumeKeyEvent();
-                break;
-            case "Numpad0":
-            case "Digit0":
-                if (this.cardState !== CardState.Back) {
-                    break;
-                }
-                void this.processReviewHandler(ReviewResponse.Reset);
-                consumeKeyEvent();
-                break;
-            default:
-                break;
+            }
         }
     };
 }

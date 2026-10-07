@@ -270,6 +270,10 @@ export interface IBaseLocale {
     SCHEDULING_DATA_HAS_BEEN_DELETED: string;
     USE_CUSTOM_HOTKEYS: string;
     USE_CUSTOM_HOTKEYS_DESC: string;
+    ANSWER_KEYS: string;
+    ANSWER_KEYS_DESC: string;
+    ANSWER_KEYS_ANKI: string;
+    ANSWER_KEYS_ORIGINAL: string;
 
     // sidebar.ts
     NOTES_REVIEW_QUEUE: string;

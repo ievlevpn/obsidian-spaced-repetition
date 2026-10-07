@@ -1,6 +1,7 @@
 import { StorageType } from "src/data/data-store/base/data-store";
 import { t } from "src/lang/helpers";
 import { SRAlgorithmType } from "src/scheduling/algorithms/base/isr-algorithm";
+import { AnswerKeys } from "src/scheduling/answer-keys";
 import { pathMatchesPattern } from "src/utils/fs";
 
 export interface SRSettings {
@@ -73,6 +74,9 @@ export interface SRSettings {
     showDeleteButtonInFileMenu: boolean;
     openViewInNewTab: boolean;
     useCustomHotkeys: boolean;
+    // Number keys during review: "original" (1 Hard, 2 Good, 3 Easy, 0 Reset) or "anki" (1 Again,
+    // 2 Hard, 3 Good, 4 Easy)
+    answerKeys: AnswerKeys;
     useCalloutsForSchedulingComments: boolean;
 
     // algorithm
@@ -165,6 +169,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     mobileSwipeToSkip: true,
     mobileSwipeToUndo: true,
     useCustomHotkeys: false,
+    answerKeys: "original",
     useCalloutsForSchedulingComments: false,
 
     // algorithm
