@@ -5,6 +5,7 @@ import { DataManager } from "src/data/data-manager";
 import { Card } from "src/data/data-structures/card/card";
 import { Question } from "src/data/data-structures/card/questions/question";
 import { Deck } from "src/data/data-structures/deck/deck";
+import { iteratorOrderFromNames } from "src/data/data-structures/deck/deck-tree-iterator";
 import { SRSettings } from "src/data/settings";
 import { t } from "src/lang/helpers";
 import SRPlugin from "src/main";
@@ -62,6 +63,9 @@ export interface SessionData {
 
     currentQuestion: Question;
     currentNote: Note;
+
+    // The card order of this session: the setting, or one chosen from a deck's menu
+    cardOrder: string;
 }
 
 // TODO: Refactor/integrate this code with the backend
@@ -84,6 +88,9 @@ export default class ContentManager {
     private cardContainer: CardContainer;
 
     private reviewQueueLoader: ReviewQueueLoader;
+    // The card order in use: the setting's, or one chosen from a deck's menu for one session.
+    // A freshly loaded review queue is built with the setting's.
+    private sessionCardOrder: string = "";
     private sessionData: SessionData | null = null;
 
     private lastPressedOnProcessReview: number = 0;
@@ -146,6 +153,7 @@ export default class ContentManager {
     public async open() {
         // Prepare a review queue to display
         this.reviewSequencer = await this.reviewQueueLoader.loadReviewQueue();
+        this.sessionCardOrder = this.settings.flashcardCardOrder;
 
         // Determine if the card view should be opened immediately
         const subdecksWithCardsInQueue: Deck[] = this.reviewSequencer.getSubDecksWithCardsInQueue(
@@ -192,6 +200,7 @@ export default class ContentManager {
         await this.reviewSequencer?.flushPendingCardComment();
         if (reloadReviewQueue) {
             this.reviewSequencer = await this.reviewQueueLoader.loadReviewQueue();
+            this.sessionCardOrder = this.settings.flashcardCardOrder;
         }
         if (this.reviewSequencer === null) return;
         this.cardContainer.closeSession();
@@ -325,6 +334,7 @@ export default class ContentManager {
             totalDecksInSession,
             currentQuestion: this.reviewSequencer.currentQuestion,
             currentNote: this.reviewSequencer.currentNote,
+            cardOrder: this.sessionCardOrder || this.settings.flashcardCardOrder,
         };
     }
 
@@ -540,9 +550,17 @@ export default class ContentManager {
 
     // MARK: Deck button handlers
 
-    private async _startReviewOfDeck(deck: Deck) {
+    /**
+     * @param cardOrder - A card order for this session only (from the deck's menu), or the
+     *   setting's when omitted
+     */
+    private async _startReviewOfDeck(deck: Deck, cardOrder?: string) {
         if (this.reviewSequencer === null) return;
         this.cardContainer.resetTypeAnswers();
+        this.sessionCardOrder = cardOrder ?? this.settings.flashcardCardOrder;
+        this.reviewSequencer.setCardOrder(
+            iteratorOrderFromNames(this.sessionCardOrder, this.settings.flashcardDeckOrder),
+        );
         this.reviewSequencer.setCurrentDeck(deck.getTopicPath());
         if (this.reviewSequencer.hasCurrentCard) {
             await this._reviewDeck(deck);
@@ -555,6 +573,7 @@ export default class ContentManager {
         this.reviewQueueLoader.setReviewMode(reviewMode);
         this.reviewMode = reviewMode;
         this.reviewSequencer = await this.reviewQueueLoader.loadReviewQueue();
+        this.sessionCardOrder = this.settings.flashcardCardOrder;
         this.deckContainer.closeList();
         await this._showDecksList();
     }

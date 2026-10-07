@@ -308,7 +308,7 @@ export class CardContainer {
         // Update current deck info
         this.cardState = sessionData.cardData.currentCardState;
 
-        this._updateInfoBar(sessionData, settings.flashcardCardOrder);
+        this._updateInfoBar(sessionData, sessionData.cardOrder);
 
         // Update card content
         await this.drawCardFrontContent(sessionData, settings);

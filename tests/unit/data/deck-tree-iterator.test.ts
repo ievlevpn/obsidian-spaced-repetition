@@ -2,6 +2,7 @@ import { Deck } from "src/data/data-structures/deck/deck";
 import {
     DeckOrder,
     DeckTreeIterator,
+    iteratorOrderFromNames,
     RepItemOrder,
 } from "src/data/data-structures/deck/deck-tree-iterator";
 import { TopicPath } from "src/data/data-structures/deck/topic-path";
@@ -805,5 +806,37 @@ describe("RepItemOrder.DueFirstRandomDeckAndCard", () => {
         // The two due cards live in different decks and are drawn back to back, which a
         // PrevDeckComplete_* order could not do.
         expect(decks.slice(0, 2)).toEqual(["flashcards", "science"]);
+    });
+});
+
+describe("setIteratorOrder: a deck reviewed in another order for one session", () => {
+    const text: string = `#flashcards
+Q1::A1
+Q2::A2 <!--SR:!2023-09-02,4,270-->
+Q3::A3`;
+
+    test("switching from due first to new first changes the first card", async () => {
+        const deck: Deck = await SampleItemDecks.createDeckFromText(text, TopicPath.emptyPath);
+        const iterator = new DeckTreeIterator(
+            iteratorOrderFromNames("DueFirstSequential", "PrevDeckComplete_Sequential"),
+            deck,
+        );
+        iterator.setIteratorTopicPath(TopicPath.getTopicPathFromTag("#flashcards"));
+        expect(iterator.nextRepItem()).toEqual(true);
+        expect(iterator.currentRepItem.front).toEqual("Q2");
+
+        iterator.setIteratorOrder(
+            iteratorOrderFromNames("NewFirstSequential", "PrevDeckComplete_Sequential"),
+        );
+        iterator.setIteratorTopicPath(TopicPath.getTopicPathFromTag("#flashcards"));
+        expect(iterator.nextRepItem()).toEqual(true);
+        expect(iterator.currentRepItem.front).toEqual("Q1");
+    });
+
+    test("an unknown order name falls back to due first, sequential", () => {
+        expect(iteratorOrderFromNames("nonsense", "nonsense")).toEqual({
+            repItemOrder: RepItemOrder.DueFirstSequential,
+            deckOrder: DeckOrder.PrevDeckComplete_Sequential,
+        });
     });
 });

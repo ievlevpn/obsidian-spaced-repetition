@@ -19,7 +19,7 @@ export class DeckContainer {
     constructor(
         parentEl: HTMLElement,
         changeReviewMode: (reviewMode: FlashcardReviewMode) => void,
-        startReviewOfDeck: (deck: Deck) => void,
+        startReviewOfDeck: (deck: Deck, cardOrder?: string) => void,
         closeModal?: () => void,
     ) {
         // Build ui
