@@ -1,0 +1,87 @@
+/* MARK: Typing the answer */
+
+.sr-typed {
+    display: flex;
+    justify-content: center;
+    width: 100%;
+    margin: var(--size-4-4) 0;
+}
+
+.sr-typed .sr-typed-input {
+    width: 100%;
+    max-width: 460px;
+    height: var(--input-height);
+    font-size: var(--font-ui-medium);
+}
+
+.sr-typed-result {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--size-2-2);
+    margin-bottom: var(--size-4-4);
+}
+
+.sr-typed-line {
+    font-size: var(--font-ui-large);
+    white-space: pre-wrap;
+    word-break: break-word;
+
+    &:empty::before {
+        content: "\2014";
+        color: var(--text-faint);
+    }
+}
+
+.sr-typed-arrow,
+.sr-typed-check {
+    display: inline-flex;
+    color: var(--text-faint);
+
+    & svg {
+        width: var(--icon-s);
+        height: var(--icon-s);
+    }
+}
+
+.sr-typed-check {
+    margin-inline-start: var(--size-4-2);
+    vertical-align: middle;
+    color: var(--color-green);
+}
+
+.sr-typed-ok {
+    color: var(--color-green);
+}
+
+.sr-typed-wrong,
+.sr-typed-missing {
+    border-radius: var(--radius-s);
+    color: var(--color-red);
+    background-color: rgba(var(--color-red-rgb), 0.12);
+}
+
+.sr-typed-wrong {
+    text-decoration: line-through;
+}
+
+.sr-typed-missing {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+/* A cloze blank answered by typing: what was typed, then the expected answer when they differ */
+.sr-typed-cloze .sr-typed-expected {
+    margin-inline-start: var(--size-4-1);
+
+    &::before {
+        content: "\2192\00a0";
+        color: var(--text-faint);
+    }
+}
+
+/* The rating the typed answer suggests; the choice stays with you */
+.sr-response .sr-response-button.sr-is-suggested {
+    outline: 2px solid var(--interactive-accent);
+    outline-offset: 2px;
+}

@@ -542,6 +542,7 @@ export default class ContentManager {
 
     private async _startReviewOfDeck(deck: Deck) {
         if (this.reviewSequencer === null) return;
+        this.cardContainer.resetTypeAnswers();
         this.reviewSequencer.setCurrentDeck(deck.getTopicPath());
         if (this.reviewSequencer.hasCurrentCard) {
             await this._reviewDeck(deck);

@@ -23,6 +23,8 @@ const en: IBaseLocale = {
     CARD_STATUS_NEW_HINT: "You have not answered this card before",
     CARD_STATUS_SEEN: "seen",
     CARD_STATUS_SEEN_HINT: "You have answered this card before",
+    TYPE_ANSWERS: "Type answers",
+    TYPED_ANSWER_PLACEHOLDER: "Type the answer",
     CARD_NOTE_PLACEHOLDER: "Note to self…",
     CARD_NOTE_EDIT: "Edit this note",
     CARD_NOTE_EDIT_LINK: "edit",

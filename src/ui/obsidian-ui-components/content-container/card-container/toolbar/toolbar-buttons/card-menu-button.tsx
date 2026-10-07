@@ -3,8 +3,15 @@ import { Menu } from "obsidian";
 import { t } from "src/lang/helpers";
 import MenuButtonComponent from "src/ui/obsidian-ui-components/content-container/menu-button";
 
+/** The card menu's "Type answers" switch: on for the current session only. */
+export interface TypeAnswersToggle {
+    get(): boolean;
+    set(on: boolean): void;
+}
+
 export default class CardMenuButtonComponent extends MenuButtonComponent {
     private isResetButtonDisabled: boolean;
+    public typeAnswersToggle: TypeAnswersToggle | null = null;
     public constructor(
         container: HTMLElement,
         isExtended: boolean,
@@ -114,6 +121,15 @@ export default class CardMenuButtonComponent extends MenuButtonComponent {
                     .onClick(async () => {
                         await jumpToCurrentCard();
                     });
+            });
+        }
+        const toggle = this.typeAnswersToggle;
+        if (toggle !== null) {
+            cardMenu.addItem((item) => {
+                item.setTitle(t("TYPE_ANSWERS"))
+                    .setIcon("keyboard")
+                    .setChecked(toggle.get())
+                    .onClick(() => toggle.set(!toggle.get()));
             });
         }
         cardMenu.addItem((item) => {

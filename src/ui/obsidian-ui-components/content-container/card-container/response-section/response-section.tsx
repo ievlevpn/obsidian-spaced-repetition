@@ -70,6 +70,7 @@ export default class ResponseSectionComponent {
 
     public resetResponseButtons() {
         // Sets all buttons in to their default state
+        this.setSuggested(null);
         if (this.responseEl.hasClass("sr-is-hidden")) {
             this.responseEl.removeClass("sr-is-hidden");
         }
@@ -78,6 +79,21 @@ export default class ResponseSectionComponent {
         this.hardButton.buttonEl.addClass("sr-is-hidden");
         this.goodButton.buttonEl.addClass("sr-is-hidden");
         this.easyButton.buttonEl.addClass("sr-is-hidden");
+    }
+
+    /**
+     * Outlines the rating that a typed answer suggests (Good for a right answer, Again for a wrong
+     * one), or none. The choice stays with the user.
+     */
+    public setSuggested(response: ReviewResponse | null) {
+        const buttons: [ReviewResponse, SRResponseButtonComponent][] = [
+            [ReviewResponse.Again, this.againButton],
+            [ReviewResponse.Hard, this.hardButton],
+            [ReviewResponse.Good, this.goodButton],
+            [ReviewResponse.Easy, this.easyButton],
+        ];
+        for (const [r, button] of buttons)
+            button.buttonEl.toggleClass("sr-is-suggested", r === response);
     }
 
     public hideAllButtons() {
