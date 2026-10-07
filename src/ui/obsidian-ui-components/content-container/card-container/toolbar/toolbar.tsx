@@ -4,6 +4,9 @@ import { Platform } from "obsidian";
 import { Deck } from "src/data/data-structures/deck/deck";
 import { DeckStats } from "src/scheduling/flashcard-review-sequencer";
 import DeckInfoComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/deck-info/deck-info";
+import ProgressBarComponent, {
+    ProgressBarStyle,
+} from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/progress-bar/progress-bar";
 import BackButtonComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/back-button";
 import CardMenuButtonComponent, {
     CardMarkerActions,
@@ -18,6 +21,8 @@ import EmulatedPlatform from "src/utils/platform-detector";
 
 export default class CardToolbarComponent {
     private toolbar: HTMLDivElement;
+    // The thin line along the bottom of the toolbar
+    public progressBar: ProgressBarComponent;
     private infoSection: DeckInfoComponent;
     private resetButton: ResetButtonComponent;
     private undoButton: UndoButtonComponent;
@@ -120,6 +125,8 @@ export default class CardToolbarComponent {
                 : ["clickable-icon", "sr-extended-menu-button"],
         );
 
+        this.progressBar = new ProgressBarComponent(this.toolbar);
+
         // If we don't have a close modal, we don't need the close button
         if (closeModal === undefined) return;
 
@@ -150,7 +157,13 @@ export default class CardToolbarComponent {
         totalDecksInSession: number,
         currentDeckTotalCardsInQueue: number,
         flashcardCardOrder: string,
+        progressBarStyle: ProgressBarStyle,
     ) {
+        this.progressBar.update(
+            totalCardsInSession - chosenDeckStats.cardsInQueueCount,
+            totalCardsInSession,
+            progressBarStyle,
+        );
         this.infoSection.updateInfo(
             chosenDeck.deckName,
             totalCardsInSession,
