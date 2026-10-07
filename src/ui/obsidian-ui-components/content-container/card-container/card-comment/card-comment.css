@@ -189,6 +189,12 @@
     }
 }
 
+/* Square on mobile: the rounder mobile input corners clipped the first letter */
+.is-mobile .sr-card-comment-editor,
+.is-mobile .sr-card-comment-input {
+    border-radius: 0;
+}
+
 .is-phone .sr-card-comment-editor .markdown-source-view.mod-cm6 .cm-scroller {
     max-height: 120px;
 }
