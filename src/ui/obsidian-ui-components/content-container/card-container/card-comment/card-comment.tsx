@@ -3,7 +3,6 @@ import { App, Platform } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
-import { CardNoteSheet } from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-note-sheet";
 import {
     createEmbeddedMarkdownEditor,
     EmbeddedMarkdownEditor,
@@ -49,13 +48,6 @@ export default class CardCommentComponent {
     private moreLink: HTMLAnchorElement;
     private showAllNotes: boolean = false;
 
-    // On phones there is no box under the card: "add note" (and each note's "edit") opens a
-    // chat-like sheet instead, and the text being written lives here until it is saved
-    private sheetMode: boolean = Platform.isMobile || EmulatedPlatform().isMobile;
-    private draft: string = "";
-    private filePath: string = "";
-    private addLink: HTMLAnchorElement | null = null;
-
     public constructor(
         parentEl: HTMLElement,
         app: App,
@@ -99,20 +91,6 @@ export default class CardCommentComponent {
             e.preventDefault();
             this.setOpen(!this.isOpen, true);
         });
-
-        if (this.sheetMode) {
-            this.saveLink.addClass("sr-is-hidden");
-            this.toggleLink.addClass("sr-is-hidden");
-            this.addLink = bar.createEl("a");
-            this.addLink.addClass("sr-card-comment-add");
-            this.addLink.addEventListener("click", (e: MouseEvent) => {
-                e.preventDefault();
-                this.openSheet();
-            });
-            this.updateAddLink();
-            this.inputEl = this.container.createDiv("sr-is-hidden");
-            return;
-        }
 
         this.editor = createEmbeddedMarkdownEditor(
             app,
@@ -181,46 +159,11 @@ export default class CardCommentComponent {
         this.editor = null;
     }
 
-    // Phones: opens the sheet for a new note (or the draft), or for the note being edited
-    private openSheet(): void {
-        new CardNoteSheet(this.app, this.plugin, {
-            entries: this.entries,
-            editIndex: this.editIndex,
-            text: this.draft,
-            filePath: this.filePath,
-            onSend: (text: string) => {
-                this.draft = text;
-                void this.onSave();
-            },
-            onDismiss: (text: string) => {
-                if (this.editIndex !== null) {
-                    // Closing an edit abandons it
-                    this.stopEditing();
-                    this.draft = "";
-                } else {
-                    this.draft = text;
-                }
-                this.updateAddLink();
-            },
-        }).open();
-    }
-
-    // "add note", or "note draft" while unsent text is waiting (saved with the rating, too)
-    private updateAddLink(): void {
-        this.addLink?.setText(this.draft.trim() === "" ? t("CARD_NOTE_ADD") : t("CARD_NOTE_DRAFT"));
-    }
-
     private getInput(): string {
-        if (this.sheetMode) return this.draft;
         return this.editor ? this.editor.getValue() : (this.textarea?.value ?? "");
     }
 
     private setInput(value: string): void {
-        if (this.sheetMode) {
-            this.draft = value;
-            this.updateAddLink();
-            return;
-        }
         if (this.editor) this.editor.setValue(value);
         else if (this.textarea) {
             this.textarea.value = value;
@@ -243,7 +186,6 @@ export default class CardCommentComponent {
         if (!keepExpanded) this.showAllNotes = false;
         this.stopEditing();
         this.setInput("");
-        this.filePath = filePath;
         this.editor?.setFilePath(filePath);
         this.pastEntries.empty();
         this.entries = cardCommentDefinition
@@ -279,7 +221,6 @@ export default class CardCommentComponent {
 
     /** Puts the cursor in the box, e.g. after saving, to write the next note. */
     public focus(): void {
-        if (this.sheetMode) return;
         if (this.editor) this.editor.focus();
         else this.textarea?.focus();
     }
@@ -320,13 +261,6 @@ export default class CardCommentComponent {
     private startEditing(index: number): void {
         const entry: CardCommentEntry | undefined = this.entries[index];
         if (!entry) return;
-        if (this.sheetMode) {
-            this.editIndex = index;
-            this.draft = entry.text;
-            this.pastEntries.children[index]?.addClass("is-being-edited");
-            this.openSheet();
-            return;
-        }
         if (!this.isOpen) this.setOpen(true, false);
         this.editIndex = index;
         this.setInput(entry.text);

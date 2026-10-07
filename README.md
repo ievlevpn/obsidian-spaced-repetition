@@ -66,8 +66,6 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 - Write notes on a card while reviewing; they are stored as a markdown footnote in the note,
   with dated entries.
 - The note box is a real Obsidian editor (live preview, editor plugins such as latex-suite).
-- On phones, notes are written in a small chat-like window above the keyboard ("add note", or a
-  note's "edit"), showing the card's notes so far; closing it keeps the text as a draft.
   Past notes can be edited or deleted, saved right away (`Ctrl/Cmd+Enter`), and long histories
   are folded.
 

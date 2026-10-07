@@ -97,14 +97,6 @@
     margin-left: 0;
 }
 
-/* Phones: opens the note sheet */
-.sr-card-comment-add {
-    margin-left: auto;
-    color: var(--text-muted);
-    text-decoration: none;
-    cursor: pointer;
-}
-
 .sr-card-comment-toggle {
     margin-left: auto;
     color: var(--text-faint);
