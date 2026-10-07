@@ -153,7 +153,10 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
         !crossesMathBoundary(i);
 
     // Record a card. Leading blank lines, and in marker mode leading headings (already shown in
-    // the card's context breadcrumb), are not part of it.
+    // the card's context breadcrumb), are not part of it. Nor are trailing blank lines and
+    // headings: a heading at the end of a card introduces what follows (e.g. a heading right
+    // above the inline card that closes this one), and the schedule comment, written at the end
+    // of the card's last line, would otherwise land on it. A heading with a cloze is content.
     const pushCard = (type: CardType, raw: string, first: number, last: number): void => {
         const rawLines: string[] = raw.split("\n");
         while (
@@ -162,6 +165,22 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
         ) {
             rawLines.shift();
             first++;
+        }
+        // Only when the lines map one to one to the note's lines (not across a code block)
+        if (first + rawLines.length - 1 === last) {
+            const isTrailingFiller = (k: number): boolean =>
+                rawLines[k].trim().length === 0 ||
+                (/^#{1,6}\s/.test(rawLines[k]) && !isClozeLine(first + k));
+            let keep: number = rawLines.length;
+            while (keep > 0 && isTrailingFiller(keep - 1)) keep--;
+            // Only when a heading is among them: trailing blank lines alone stay as they were
+            const trimsHeading: boolean = rawLines
+                .slice(keep)
+                .some((line) => /^#{1,6}\s/.test(line));
+            if (keep > 0 && trimsHeading) {
+                last -= rawLines.length - keep;
+                rawLines.length = keep;
+            }
         }
         const cardBody: string = rawLines.join("\n").trimEnd();
         if (cardBody.length > 0) cards.push(new ParsedQuestionInfo(type, cardBody, first, last));
