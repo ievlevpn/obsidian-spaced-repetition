@@ -28,14 +28,17 @@ export interface ISRAlgorithm {
     noteStats(): INoteEaseList;
 
     cardGetResetSchedule(): RepItemScheduleInfo;
+    // `important`: the card is marked important, which FSRS may schedule at a higher retention
     cardGetNewSchedule(
         response: ReviewResponse,
         notePath: string,
         dueDateFlashcardHistogram: DueDateHistogram,
+        important?: boolean,
     ): RepItemScheduleInfo;
     cardCalcUpdatedSchedule(
         response: ReviewResponse,
         schedule: RepItemScheduleInfo,
         dueDateFlashcardHistogram: DueDateHistogram,
+        important?: boolean,
     ): RepItemScheduleInfo;
 }

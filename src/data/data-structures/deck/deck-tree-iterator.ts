@@ -39,8 +39,13 @@ export enum DeckOrder {
  * @param cardOrder - A RepItemOrder name, e.g. "NewFirstSequential"
  * @param deckOrder - A DeckOrder name
  */
-export function iteratorOrderFromNames(cardOrder: string, deckOrder: string): IIteratorOrder {
+export function iteratorOrderFromNames(
+    cardOrder: string,
+    deckOrder: string,
+    importantFirst: boolean = false,
+): IIteratorOrder {
     return {
+        importantFirst,
         repItemOrder:
             RepItemOrder[cardOrder as keyof typeof RepItemOrder] ?? RepItemOrder.DueFirstSequential,
         deckOrder:
@@ -55,6 +60,35 @@ export interface IIteratorOrder {
 
     // Choose decks in sequential order, or randomly
     deckOrder: DeckOrder;
+
+    // Within each pool of cards the order draws from, important cards come first
+    importantFirst?: boolean;
+}
+
+/**
+ * Positions of the important cards in a list of cards.
+ */
+function importantIndices(cards: Card[]): number[] {
+    const result: number[] = [];
+    cards.forEach((card, i) => {
+        if (card.markers?.important) result.push(i);
+    });
+    return result;
+}
+
+/**
+ * Positions of the important cards of a deck in one list, or for AnyItem in the new list followed
+ * by the due list (the numbering of setNewOrDueCardIdx).
+ */
+function importantIndicesInDeck(deck: Deck, state: RepItemState): number[] {
+    if (state !== RepItemState.AnyItem) {
+        return importantIndices(deck.getRepItemListForRepItemState(state));
+    }
+    const newCount: number = deck.newRepItems.length;
+    return [
+        ...importantIndices(deck.newRepItems),
+        ...importantIndices(deck.dueRepItems).map((i) => i + newCount),
+    ];
 }
 
 /**
@@ -229,17 +263,25 @@ class SingleDeckIterator {
 
         const result: boolean = cardList.length > 0;
         if (result) {
+            const important: number[] = this.iteratorOrder.importantFirst
+                ? importantIndices(cardList)
+                : [];
             switch (this.iteratorOrder.repItemOrder) {
                 case RepItemOrder.DueFirstSequential:
                 case RepItemOrder.NewFirstSequential:
-                    // We always pick the card with index 0
+                    // We always pick the card with index 0 (or the first important card)
                     // Sequential retrieval occurs by the caller deleting the card at this index after it is used
-                    this.cardIdx = 0;
+                    this.cardIdx = important.length > 0 ? important[0] : 0;
                     break;
 
                 case RepItemOrder.DueFirstRandom:
                 case RepItemOrder.NewFirstRandom:
-                    this.cardIdx = globalRandomNumberProvider.getInteger(0, cardList.length - 1);
+                    this.cardIdx =
+                        important.length > 0
+                            ? important[
+                                  globalRandomNumberProvider.getInteger(0, important.length - 1)
+                              ]
+                            : globalRandomNumberProvider.getInteger(0, cardList.length - 1);
                     break;
             }
         }
@@ -470,17 +512,26 @@ export class DeckTreeIterator implements IDeckTreeIterator {
                 : [RepItemState.AnyItem];
 
         for (const state of states) {
+            // Important cards first: while any is left in this pool, draw only among them
+            const important: number[][] = this.iteratorOrder.importantFirst
+                ? this.deckArray.map((deck) => importantIndicesInDeck(deck, state))
+                : [];
+            const onlyImportant: boolean = important.some((list) => list.length > 0);
+
             // Make the chance of picking a specific deck proportional to the number of cards within
             const weights: Record<number, number> = {};
             for (let i = 0; i < this.deckArray.length; i++) {
-                const cardCount: number = this.deckArray[i].getRepItemCount(state, false);
+                const cardCount: number = onlyImportant
+                    ? important[i].length
+                    : this.deckArray[i].getRepItemCount(state, false);
                 if (cardCount) {
                     weights[i] = cardCount;
                 }
             }
             if (Object.keys(weights).length === 0) continue;
 
-            const [deckIdx, cardIdx] = this.weightedRandomNumber.getRandomValues(weights);
+            const [deckIdx, drawn] = this.weightedRandomNumber.getRandomValues(weights);
+            const cardIdx: number = onlyImportant ? important[deckIdx][drawn] : drawn;
             this.setDeckIdx(deckIdx);
             if (state === RepItemState.AnyItem) {
                 this.singleDeckIterator.setNewOrDueCardIdx(cardIdx);

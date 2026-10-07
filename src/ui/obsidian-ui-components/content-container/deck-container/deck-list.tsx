@@ -7,6 +7,7 @@ import { t } from "src/lang/helpers";
 import { DeckStats, IFlashcardReviewSequencer } from "src/scheduling/flashcard-review-sequencer";
 import {
     attachContextMenu,
+    DeckReviewOptions,
     showCardOrderMenu,
 } from "src/ui/obsidian-ui-components/content-container/deck-container/card-order-menu";
 
@@ -27,13 +28,13 @@ export default class DeckListComponent {
     private reviewedCardsText: HTMLDivElement;
     private totalCardsText: HTMLDivElement;
 
-    private startReviewOfDeck: (deck: Deck, cardOrder?: string) => void;
+    private startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void;
     // The settings' card order, ticked in a deck's menu of orders
     private defaultCardOrder: string = "";
 
     public constructor(
         parentEl: HTMLElement,
-        startReviewOfDeck: (deck: Deck, cardOrder?: string) => void,
+        startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void,
     ) {
         this.startReviewOfDeck = startReviewOfDeck;
         // Prep main container
@@ -161,7 +162,7 @@ export default class DeckListComponent {
         parentEl: HTMLDivElement,
         reviewSequencer: IFlashcardReviewSequencer,
         settings: SRSettings,
-        startReviewOfDeck: (deck: Deck, cardOrder?: string) => void,
+        startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void,
     ) {
         const deckStats = reviewSequencer.getDeckStats(deck.getTopicPath());
 
@@ -195,7 +196,7 @@ export default class DeckListComponent {
         parentEl: HTMLDivElement,
         initiallyExpanded: boolean = false,
         deck: Deck | null = null,
-        startReviewOfDeck: (deck: Deck, cardOrder?: string) => void = () => {},
+        startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void = () => {},
     ): HTMLDivElement {
         const disableInteraction = deck === null;
         const treeRow = parentEl.createDiv();
@@ -257,14 +258,14 @@ export default class DeckListComponent {
             treeRowSelf.addEventListener("click", () => {
                 startReviewOfDeck(deck);
             });
-            // Right-click (long-press on a phone): review this deck in another order, this time only
-            if (treeRowSelf.hasClass("is-clickable")) {
-                attachContextMenu(treeRowSelf, (position) =>
-                    showCardOrderMenu(position, this.defaultCardOrder, (cardOrder) =>
-                        startReviewOfDeck(deck, cardOrder),
-                    ),
-                );
-            }
+            // Right-click (long-press on a phone): review this deck in another order, or only its
+            // important cards, this time only. Also on decks with nothing due: important cards can
+            // be reviewed whenever.
+            attachContextMenu(treeRowSelf, (position) =>
+                showCardOrderMenu(position, this.defaultCardOrder, (options) =>
+                    startReviewOfDeck(deck, options),
+                ),
+            );
         }
 
         this._createStatsInRow(treeRowOuter, deckStats);

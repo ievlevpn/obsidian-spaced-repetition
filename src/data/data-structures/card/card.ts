@@ -1,3 +1,4 @@
+import { CardMarkers, emptyCardMarkers } from "src/data/card-markers";
 import { Question } from "src/data/data-structures/card/questions/question";
 import {
     RepetitionItem,
@@ -12,6 +13,9 @@ export class Card extends RepetitionItem {
     // visuals
     front: string = "";
     back: string = "";
+
+    // Suspended / important, as written in the card's schedule comment
+    markers: CardMarkers = emptyCardMarkers();
 
     constructor(init?: Partial<Card>) {
         super(RepetitionItemType.Card, RepetitionPhase.New, null, null);

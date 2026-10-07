@@ -88,6 +88,10 @@ export interface SRSettings {
     maximumInterval: number;
     maxLinkFactor: number;
     fsrsDesiredRetention: number;
+    // Important cards: shown first in a review; with FSRS, optionally kept at a higher retention
+    importantFirst: boolean;
+    importantHigherRetention: boolean;
+    importantRetention: number;
     startOfDay: string;
 
     // storage
@@ -181,6 +185,9 @@ export const DEFAULT_SETTINGS: SRSettings = {
     maximumInterval: 36525,
     maxLinkFactor: 1.0,
     fsrsDesiredRetention: 0.9,
+    importantFirst: false,
+    importantHigherRetention: false,
+    importantRetention: 0.95,
     startOfDay: "00:00:00",
 
     // storage

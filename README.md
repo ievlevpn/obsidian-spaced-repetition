@@ -47,6 +47,13 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   wrong and missing letters, and Good or Again is suggested. Ported from
   [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT).
 - A quiet "new" / "seen" label on each card.
+- Important cards: mark a card with `I` or from the card menu (a star shows on it). Review only the
+  important cards of a deck from its menu; optionally show them first in every review, and, with
+  FSRS, schedule them for a higher retention (settings, _Important cards_).
+- Suspend a card from the card menu: it leaves every review until unsuspended. _Suspended cards_
+  (deck list header, or the command palette) lists them with Open and Unsuspend.
+- Both are stored as markers after the card's schedule (`<!--SR:!...,imp,susp-->`), which the
+  original plugin ignores.
 - Answer keys: the original layout (1 Hard, 2 Good, 3 Easy, 0 Reset) or Anki's (1 Again, 2 Hard,
   3 Good, 4 Easy), chosen in the settings. Ported from Flashcard Studio.
 - The edit card window uses the same embedded Obsidian editor as card notes.

@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/content-container/deck-container/deck-list-header.css";
-import { DropdownComponent, Platform, setIcon } from "obsidian";
+import { DropdownComponent, ExtraButtonComponent, Platform, setIcon } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
@@ -15,6 +15,7 @@ export default class DeckListHeaderComponent {
     public constructor(
         parentEl: HTMLElement,
         changeReviewMode: (reviewMode: FlashcardReviewMode) => void,
+        showSuspendedCards: () => void,
         closeModal?: () => void,
     ) {
         this.header = parentEl.createDiv();
@@ -30,6 +31,11 @@ export default class DeckListHeaderComponent {
         this.title.setText(t("DECKS"));
 
         this.header.createDiv().addClass("sr-flex-spacer");
+        new ExtraButtonComponent(this.header)
+            .setIcon("pause-circle")
+            .setTooltip(t("SUSPENDED_CARDS"))
+            .onClick(() => showSuspendedCards())
+            .extraSettingsEl.addClass("sr-suspended-cards-button");
         this.reviewModeDropdown = new DropdownComponent(this.header);
         const reviewModeOptions: Record<string, string> = {
             Review: t("REVIEW_MODE"),

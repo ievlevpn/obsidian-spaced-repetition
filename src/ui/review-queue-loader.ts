@@ -129,6 +129,7 @@ export class ReviewQueueLoader {
         const iteratorOrder: IIteratorOrder = iteratorOrderFromNames(
             settings.flashcardCardOrder,
             settings.flashcardDeckOrder,
+            settings.importantFirst,
         );
         return new DeckTreeIterator(iteratorOrder, null);
     }

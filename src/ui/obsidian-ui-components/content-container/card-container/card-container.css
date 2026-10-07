@@ -76,3 +76,8 @@
         opacity: 0.75;
     }
 }
+
+/* The star of an important card, in front of the label */
+.sr-card-container .sr-content .sr-card-status .sr-card-important {
+    color: var(--color-yellow);
+}

@@ -9,9 +9,17 @@ export interface TypeAnswersToggle {
     set(on: boolean): void;
 }
 
+/** The card menu's "Important" and "Suspend card" items. */
+export interface CardMarkerActions {
+    isImportant(): boolean;
+    toggleImportant(): void;
+    suspend(): void;
+}
+
 export default class CardMenuButtonComponent extends MenuButtonComponent {
     private isResetButtonDisabled: boolean;
     public typeAnswersToggle: TypeAnswersToggle | null = null;
+    public markerActions: CardMarkerActions | null = null;
     public constructor(
         container: HTMLElement,
         isExtended: boolean,
@@ -121,6 +129,20 @@ export default class CardMenuButtonComponent extends MenuButtonComponent {
                     .onClick(async () => {
                         await jumpToCurrentCard();
                     });
+            });
+        }
+        const actions = this.markerActions;
+        if (actions !== null) {
+            cardMenu.addItem((item) => {
+                item.setTitle(t("IMPORTANT_CARD"))
+                    .setIcon("star")
+                    .setChecked(actions.isImportant())
+                    .onClick(() => actions.toggleImportant());
+            });
+            cardMenu.addItem((item) => {
+                item.setTitle(t("SUSPEND_CARD"))
+                    .setIcon("pause-circle")
+                    .onClick(() => actions.suspend());
             });
         }
         const toggle = this.typeAnswersToggle;

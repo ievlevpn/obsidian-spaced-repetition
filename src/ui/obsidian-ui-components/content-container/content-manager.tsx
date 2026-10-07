@@ -19,9 +19,11 @@ import {
 } from "src/scheduling/flashcard-review-sequencer";
 import { CardContainer } from "src/ui/obsidian-ui-components/content-container/card-container/card-container";
 import CardInfoNotice from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-info-notice";
+import { DeckReviewOptions } from "src/ui/obsidian-ui-components/content-container/deck-container/card-order-menu";
 import { DeckContainer } from "src/ui/obsidian-ui-components/content-container/deck-container/deck-container";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { FlashcardEditModal } from "src/ui/obsidian-ui-components/modals/edit-modal";
+import { SuspendedCardsModal } from "src/ui/obsidian-ui-components/modals/suspended-cards-modal";
 import { ReviewQueueLoader } from "src/ui/review-queue-loader";
 import { UIManager, UIState } from "src/ui/ui-manager";
 import EmulatedPlatform from "src/utils/platform-detector";
@@ -91,6 +93,8 @@ export default class ContentManager {
     // The card order in use: the setting's, or one chosen from a deck's menu for one session.
     // A freshly loaded review queue is built with the setting's.
     private sessionCardOrder: string = "";
+    // While reviewing only important cards: the review mode to return to afterwards
+    private importantSessionMode: FlashcardReviewMode | null = null;
     private sessionData: SessionData | null = null;
 
     private lastPressedOnProcessReview: number = 0;
@@ -117,6 +121,7 @@ export default class ContentManager {
             parentEl,
             this._changeReviewMode.bind(this),
             this._startReviewOfDeck.bind(this),
+            () => new SuspendedCardsModal(this.app, this.plugin).open(),
             closeModal,
         );
 
@@ -137,6 +142,11 @@ export default class ContentManager {
             this._saveCardCommentNow.bind(this),
             closeModal,
         );
+        this.cardContainer.setMarkerActions({
+            isImportant: () => this.reviewSequencer?.currentCard?.markers.important ?? false,
+            toggleImportant: () => void this._toggleCurrentCardImportant(),
+            suspend: () => void this._suspendCurrentCard(),
+        });
     }
 
     public async close(): Promise<void> {
@@ -198,6 +208,12 @@ export default class ContentManager {
         this._clearPendingResumeTimeout();
         this._stageCardComment();
         await this.reviewSequencer?.flushPendingCardComment();
+        // Leaving a review of important cards: back to the review mode and queue of the deck list
+        if (this.importantSessionMode !== null) {
+            this.reviewMode = this.importantSessionMode;
+            this.importantSessionMode = null;
+            reloadReviewQueue = true;
+        }
         if (reloadReviewQueue) {
             this.reviewSequencer = await this.reviewQueueLoader.loadReviewQueue();
             this.sessionCardOrder = this.settings.flashcardCardOrder;
@@ -494,6 +510,58 @@ export default class ContentManager {
         }
     }
 
+    /**
+     * Reviews only the important cards of a deck, all of them whether due or not, in cram mode:
+     * a drill that changes no schedule.
+     */
+    private async _startImportantReview(deck: Deck): Promise<void> {
+        const core = this.plugin.dataManager.osrCore;
+        if (core === null) return;
+        const fullDeckTree: Deck = core.reviewableDeckTree;
+        const importantDeckTree: Deck = fullDeckTree.copyWithRepItemFilter(
+            (card) => card.markers.important,
+        );
+        const { reviewSequencer } = this.reviewQueueLoader.getPreparedReviewSequencer(
+            fullDeckTree,
+            importantDeckTree,
+            FlashcardReviewMode.Cram,
+        );
+
+        this.cardContainer.resetTypeAnswers();
+        this.importantSessionMode ??= this.reviewMode;
+        this.reviewMode = FlashcardReviewMode.Cram;
+        this.reviewSequencer = reviewSequencer;
+        this.sessionCardOrder = this.settings.flashcardCardOrder;
+        reviewSequencer.setCardOrder(
+            iteratorOrderFromNames(this.sessionCardOrder, this.settings.flashcardDeckOrder),
+        );
+        reviewSequencer.setCurrentDeck(deck.getTopicPath());
+        if (reviewSequencer.hasCurrentCard) {
+            await this._reviewDeck(deck);
+        } else {
+            new Notice(t("NO_IMPORTANT_CARDS"));
+            await this._showDecksList();
+        }
+    }
+
+    private async _toggleCurrentCardImportant(): Promise<void> {
+        if (this.reviewSequencer === null || this.sessionData === null) return;
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
+        const important: boolean = await this.reviewSequencer.toggleCurrentCardImportant();
+        new Notice(important ? t("CARD_MARKED_IMPORTANT") : t("CARD_UNMARKED_IMPORTANT"));
+        this.cardContainer.refreshCardStatus(this.sessionData);
+    }
+
+    private async _suspendCurrentCard(): Promise<void> {
+        if (this.reviewSequencer === null) return;
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
+        await this.reviewSequencer.suspendCurrentCard();
+        new Notice(t("CARD_SUSPENDED"));
+        await this._showNextCard();
+    }
+
     public async _skipCurrentCard() {
         if (this.reviewSequencer === null) return;
         this._stageCardComment();
@@ -554,12 +622,20 @@ export default class ContentManager {
      * @param cardOrder - A card order for this session only (from the deck's menu), or the
      *   setting's when omitted
      */
-    private async _startReviewOfDeck(deck: Deck, cardOrder?: string) {
+    private async _startReviewOfDeck(deck: Deck, options: DeckReviewOptions = {}) {
         if (this.reviewSequencer === null) return;
+        if (options.importantOnly) {
+            await this._startImportantReview(deck);
+            return;
+        }
         this.cardContainer.resetTypeAnswers();
-        this.sessionCardOrder = cardOrder ?? this.settings.flashcardCardOrder;
+        this.sessionCardOrder = options.cardOrder ?? this.settings.flashcardCardOrder;
         this.reviewSequencer.setCardOrder(
-            iteratorOrderFromNames(this.sessionCardOrder, this.settings.flashcardDeckOrder),
+            iteratorOrderFromNames(
+                this.sessionCardOrder,
+                this.settings.flashcardDeckOrder,
+                this.settings.importantFirst,
+            ),
         );
         this.reviewSequencer.setCurrentDeck(deck.getTopicPath());
         if (this.reviewSequencer.hasCurrentCard) {

@@ -1,3 +1,4 @@
+import { Card } from "src/data/data-structures/card/card";
 import { QuestionPostponementList } from "src/data/data-structures/card/questions/question-postponement-list";
 import { Deck, DeckTreeFilter } from "src/data/data-structures/deck/deck";
 import { DeckTreeStatsCalculator } from "src/data/data-structures/deck/deck-tree-stats-calculator";
@@ -37,6 +38,8 @@ export class OsrCore {
     private _noteReviewQueue: NoteReviewQueue;
 
     private fullDeckTree: Deck | null = null;
+    // Suspended cards: kept out of every deck, listed in the Suspended cards view
+    private _suspendedCards: Card[] = [];
     private _reviewableDeckTree: Deck = new Deck("root", null);
     private _remainingDeckTree: Deck | null = null;
     private _cardStats: Stats | null = null;
@@ -143,6 +146,11 @@ export class OsrCore {
      *
      * @returns {Deck} - The reviewable deck tree.
      */
+    /** The suspended cards found by the last load, in note order. */
+    get suspendedCards(): Card[] {
+        return this._suspendedCards;
+    }
+
     get reviewableDeckTree(): Deck {
         return this._reviewableDeckTree;
     }
@@ -195,6 +203,7 @@ export class OsrCore {
 
         // reset flashcards stuff
         this.fullDeckTree = new Deck("root", null);
+        this._suspendedCards = [];
     }
 
     /**
@@ -218,7 +227,7 @@ export class OsrCore {
         if (topicPath.hasPath && !SettingsUtil.isAnyTagIgnoredForFlashcards(this.settings, tags)) {
             note = await this.loadNote(noteFile, topicPath);
             if (note !== null && this.fullDeckTree !== null)
-                note.appendCardsToDeck(this.fullDeckTree);
+                note.appendCardsToDeck(this.fullDeckTree, this._suspendedCards);
         }
 
         // Give the algorithm a chance to do something with the loaded note

@@ -315,6 +315,63 @@ export class SchedulingPage extends SettingsPage {
             });
         }
 
+        // Important cards: marked with I or from the card menu during review
+        const isFsrs: boolean = this.settingsManager.settings.algorithm === SRAlgorithmType.FSRS;
+        const importantGroup = new SettingGroup(this.containerEl).setHeading(t("IMPORTANT_CARDS"));
+        importantGroup.addSetting((setting: Setting) => {
+            setting
+                .setName(t("IMPORTANT_FIRST"))
+                .setDesc(t("IMPORTANT_FIRST_DESC"))
+                .addToggle((toggle) =>
+                    toggle
+                        .setValue(this.settingsManager.settings.importantFirst)
+                        .onChange(async (value) => {
+                            this.settingsManager.settings.importantFirst = value;
+                            await this.settingsManager.save();
+                        }),
+                );
+        });
+        importantGroup.addSetting((setting: Setting) => {
+            setting
+                .setName(t("IMPORTANT_HIGHER_RETENTION"))
+                .setDesc(t(isFsrs ? "IMPORTANT_HIGHER_RETENTION_DESC" : "IMPORTANT_FSRS_ONLY"))
+                .addToggle((toggle) =>
+                    toggle
+                        .setValue(this.settingsManager.settings.importantHigherRetention)
+                        .setDisabled(!isFsrs)
+                        .onChange(async (value) => {
+                            this.settingsManager.settings.importantHigherRetention = value;
+                            await this.saveAndRefreshAlgorithm();
+                            this.display();
+                        }),
+                );
+        });
+        if (isFsrs && this.settingsManager.settings.importantHigherRetention) {
+            importantGroup.addSetting((setting: Setting) => {
+                setting
+                    .setName(t("IMPORTANT_RETENTION"))
+                    .setDesc(t("IMPORTANT_RETENTION_DESC"))
+                    .addText((text) =>
+                        text
+                            .setValue(this.settingsManager.settings.importantRetention.toString())
+                            .onChange((value) => {
+                                applySettingsUpdate(async () => {
+                                    const numValue = Number.parseFloat(value);
+                                    if (Number.isNaN(numValue) || numValue <= 0 || numValue >= 1) {
+                                        new Notice(t("IMPORTANT_RETENTION_INVALID"));
+                                        text.setValue(
+                                            this.settingsManager.settings.importantRetention.toString(),
+                                        );
+                                        return;
+                                    }
+                                    this.settingsManager.settings.importantRetention = numValue;
+                                    await this.saveAndRefreshAlgorithm();
+                                });
+                            }),
+                    );
+            });
+        }
+
         if (this.settingsManager.settings.algorithm === SRAlgorithmType.SM_2_OSR) {
             algorithmGroup
                 .addSetting((setting: Setting) => {

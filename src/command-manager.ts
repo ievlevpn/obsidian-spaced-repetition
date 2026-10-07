@@ -5,6 +5,7 @@ import { t } from "src/lang/helpers";
 import SRPlugin from "src/main";
 import { ReviewResponse } from "src/scheduling/algorithms/base/repetition-item";
 import { FlashcardReviewMode } from "src/scheduling/flashcard-review-sequencer";
+import { SuspendedCardsModal } from "src/ui/obsidian-ui-components/modals/suspended-cards-modal";
 import { UIManager, UIState } from "src/ui/ui-manager";
 import EmulatedPlatform from "src/utils/platform-detector";
 
@@ -386,6 +387,15 @@ export class CommandManager {
             callback: async () => {
                 if (!this.plugin.isInitialized) return;
                 await this.uiManager.openDeckContainer(FlashcardReviewMode.Review);
+            },
+        });
+
+        this.plugin.addCommand({
+            id: "srs-show-suspended-cards",
+            name: t("SHOW_SUSPENDED_CARDS"),
+            callback: () => {
+                if (!this.plugin.isInitialized) return;
+                new SuspendedCardsModal(this.plugin.app, this.plugin).open();
             },
         });
 

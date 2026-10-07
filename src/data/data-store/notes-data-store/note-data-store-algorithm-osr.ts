@@ -1,3 +1,4 @@
+import { formatCardMarkers } from "src/data/card-markers";
 import { SR_HTML_COMMENT_BEGIN, SR_HTML_COMMENT_END } from "src/data/constants";
 import { IDataStoreAlgorithm } from "src/data/data-store/base/idata-store-algorithm";
 import { Card } from "src/data/data-structures/card/card";
@@ -42,6 +43,10 @@ export class NoteDataStoreAlgorithmOsr implements IDataStoreAlgorithm {
      * @returns {string} - The formatted card schedule.
      */
     formatCardSchedule(card: Card) {
+        return this.formatScheduleOnly(card) + formatCardMarkers(card.markers);
+    }
+
+    private formatScheduleOnly(card: Card): string {
         if (card.hasSchedule && card.scheduleInfo) {
             return card.scheduleInfo.formatScheduleAsSRHtmlComment();
         }
