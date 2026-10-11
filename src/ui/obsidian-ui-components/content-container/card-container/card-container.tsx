@@ -237,6 +237,7 @@ export class CardContainer {
         if (action === "menu") this.toolbar.openCardMenu();
         else if (action === "important") this.markerActions?.toggleImportant();
         else if (action === "bury") this.markerActions?.bury();
+        else if (action === "suspend") this.markerActions?.suspend();
     }
 
     // An edge swipe applies while a card is shown and the touch is level with the review view
@@ -798,6 +799,7 @@ export class CardContainer {
 function pullDownActionLook(action: PullDownAction): { icon: string; label: string } {
     if (action === "important") return { icon: "star", label: t("IMPORTANT_CARD") };
     if (action === "bury") return { icon: "calendar-clock", label: t("BURY_CARD") };
+    if (action === "suspend") return { icon: "pause-circle", label: t("SUSPEND_CARD") };
     return { icon: "ellipsis-vertical", label: t("OPEN_MENU") };
 }
 

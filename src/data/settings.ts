@@ -5,7 +5,7 @@ import { AnswerKeys } from "src/scheduling/answer-keys";
 import { pathMatchesPattern } from "src/utils/fs";
 
 // What pulling a card down does on mobile
-export type PullDownAction = "off" | "menu" | "important" | "bury";
+export type PullDownAction = "off" | "menu" | "important" | "bury" | "suspend";
 
 export interface SRSettings {
     // flashcards

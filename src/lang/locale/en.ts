@@ -294,7 +294,7 @@ const en: IBaseLocale = {
         "While reviewing, swipe right from the left edge of the screen to go back to the previous card, undoing your last answer or skip (like the Undo button).",
     PULL_DOWN_ACTION: "Pull a card down to",
     PULL_DOWN_ACTION_DESC:
-        "While reviewing, pull the card down from its top to open the card menu, mark the card important, or bury it (and its siblings) until tomorrow. A card scrolled down scrolls back up first; the pull only starts once it is at its top.",
+        "While reviewing, pull the card down from its top to open the card menu, mark the card important, bury it (and its siblings) until tomorrow, or suspend it. A card scrolled down scrolls back up first; the pull only starts once it is at its top.",
     PULL_DOWN_OFF: "Do nothing",
     PULL_DOWN_MENU: "Open the card menu",
     STATUS_BAR_SETTINGS: "Status Bar",

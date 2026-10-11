@@ -75,6 +75,7 @@ export class MobilePage extends SettingsPage {
                             .addOption("menu", t("PULL_DOWN_MENU"))
                             .addOption("important", t("IMPORTANT_CARD"))
                             .addOption("bury", t("BURY_CARD"))
+                            .addOption("suspend", t("SUSPEND_CARD"))
                             .addOption("off", t("PULL_DOWN_OFF"))
                             .setValue(this.settingsManager.settings.mobilePullDownAction)
                             .onChange(async (value) => {
