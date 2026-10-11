@@ -115,8 +115,11 @@ export interface TypedComparison {
     exact: boolean;
     // Matched letters over the longer of the two (0..1): how close the answer came
     similarity: number;
-    // Every typed word is a whole word of the answer: a part of it, typed right
+    // Every typed word is a word of the answer, or a typo of one: a part of it, typed right
     typedWordsInAnswer?: boolean;
+    // Not exact, but only by typos: every word of each side paired with one of the other within
+    // its typo allowance. Counts as right.
+    typosOnly?: boolean;
     // Matched against one of the answer's alternatives ("gloomy" in "gloomy, sullen")
     alternative?: boolean;
     typed: DiffPart[];
@@ -223,16 +226,32 @@ export function compareTypedAnswer(
         return { index, comparison: comparisons[index] };
     });
 
-    // Each typed item is one of the alternatives
-    if (best.every((b) => b.comparison.exact)) {
+    // Each typed item is one of the alternatives (allowing typos)
+    if (best.every((b) => b.comparison.exact || b.comparison.typosOnly)) {
+        const anyTypo: boolean = best.some((b) => !b.comparison.exact);
         const matched = new Map<number, DiffPart[]>(
-            best.map((b) => [b.index, [{ kind: "ok", text: alternatives[b.index].text }]]),
+            best.map((b) => [
+                b.index,
+                b.comparison.exact
+                    ? [{ kind: "ok", text: alternatives[b.index].text }]
+                    : b.comparison.expected,
+            ]),
         );
         return {
-            exact: true,
+            exact: !anyTypo,
+            typosOnly: anyTypo,
             similarity: 1,
+            typedWordsInAnswer: true,
             alternative: true,
-            typed: [{ kind: "ok", text: typed.trim() }],
+            typed: stitchItems(
+                typed,
+                typedItems,
+                best.map((b, i) =>
+                    b.comparison.exact
+                        ? [{ kind: "ok", text: typedItems[i].text }]
+                        : b.comparison.typed,
+                ),
+            ),
             expected: withOtherParts(expected, alternatives, matched),
         };
     }
@@ -254,6 +273,33 @@ export function compareTypedAnswer(
         };
     }
     return whole;
+}
+
+// The typed text as parts: each item with its own parts, the separators between them "ok"
+function stitchItems(
+    typed: string,
+    items: { text: string; start: number }[],
+    itemParts: DiffPart[][],
+): DiffPart[] {
+    const parts: DiffPart[] = [];
+    let at = 0;
+    items.forEach((item, i) => {
+        if (item.start > at) parts.push({ kind: "ok", text: typed.slice(at, item.start) });
+        parts.push(...itemParts[i]);
+        at = item.start + item.text.length;
+    });
+    return mergeParts(parts);
+}
+
+// Joins neighbouring parts of the same kind
+function mergeParts(parts: DiffPart[]): DiffPart[] {
+    const merged: DiffPart[] = [];
+    for (const part of parts) {
+        const last = merged[merged.length - 1];
+        if (last !== undefined && last.kind === part.kind) last.text += part.text;
+        else merged.push({ ...part });
+    }
+    return merged;
 }
 
 // The whole answer as parts: the given alternatives with their own parts, everything else "other"
@@ -278,36 +324,159 @@ function withOtherParts(
     return parts;
 }
 
+/**
+ * How many typos a word of `length` letters may have and still count: none for up to 3 letters,
+ * 1 for up to 7, 2 for longer words.
+ */
+export function typoAllowance(length: number): number {
+    return length <= 3 ? 0 : length <= 7 ? 1 : 2;
+}
+
+/**
+ * Edit distance counting an inserted, deleted or replaced letter, or two neighbouring letters
+ * swapped, as one edit each (optimal string alignment).
+ */
+export function editDistance(a: string[], b: string[]): number {
+    const d: number[][] = Array.from({ length: a.length + 1 }, (_, i) =>
+        Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)),
+    );
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost);
+            if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) {
+                d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
+            }
+        }
+    }
+    return d[a.length][b.length];
+}
+
+interface Word {
+    // Indices of its characters in the normalized text
+    idx: number[];
+    // Its letters and digits, for comparing words
+    key: string[];
+}
+
+function splitWords(text: NormalizedText): Word[] {
+    const words: Word[] = [];
+    let idx: number[] = [];
+    const flush = () => {
+        if (idx.length === 0) return;
+        const key = idx.map((i) => text.chars[i]).filter((c) => /[\p{L}\p{N}]/u.test(c));
+        words.push({ idx, key: key.length > 0 ? key : idx.map((i) => text.chars[i]) });
+        idx = [];
+    };
+    text.chars.forEach((c, i) => {
+        if (c === " ") flush();
+        else idx.push(i);
+    });
+    flush();
+    return words;
+}
+
+// How well two words match: 2 when the same, 1 within the answer word's typo allowance, else 0
+function wordMatch(typed: Word, expected: Word): number {
+    const distance = editDistance(typed.key, expected.key);
+    if (distance === 0) return 2;
+    return distance <= typoAllowance(expected.key.length) ? 1 : 0;
+}
+
+/**
+ * Pairs typed words with answer words in order, as many and as well matched as possible (a
+ * weighted longest common subsequence of words).
+ */
+function alignWords(a: Word[], b: Word[]): [number, number][] {
+    const score: number[][] = Array.from({ length: a.length }, (_, i) =>
+        b.map((_w, j) => wordMatch(a[i], b[j])),
+    );
+    const best: number[][] = Array.from({ length: a.length + 1 }, () =>
+        new Array<number>(b.length + 1).fill(0),
+    );
+    for (let i = a.length - 1; i >= 0; i--) {
+        for (let j = b.length - 1; j >= 0; j--) {
+            best[i][j] = Math.max(
+                best[i + 1][j],
+                best[i][j + 1],
+                score[i][j] > 0 ? score[i][j] + best[i + 1][j + 1] : 0,
+            );
+        }
+    }
+    const pairs: [number, number][] = [];
+    let i = 0;
+    let j = 0;
+    while (i < a.length && j < b.length) {
+        if (score[i][j] > 0 && best[i][j] === score[i][j] + best[i + 1][j + 1]) {
+            pairs.push([i, j]);
+            i++;
+            j++;
+        } else if (best[i][j] === best[i][j + 1]) {
+            j++;
+        } else {
+            i++;
+        }
+    }
+    return pairs;
+}
+
+/**
+ * Marks word by word: letters are matched only within a typed word and the answer word it is
+ * paired with; an unpaired word is wrong (typed) or missing (answer) as a whole, with the space
+ * before it.
+ */
+function markByWords(
+    typedText: NormalizedText,
+    expectedText: NormalizedText,
+): { inA: boolean[]; inB: boolean[]; pairs: number; typedWords: number; answerWords: number } {
+    const a = splitWords(typedText);
+    const b = splitWords(expectedText);
+    const pairs = alignWords(a, b);
+    const inA = new Array<boolean>(typedText.chars.length).fill(false);
+    const inB = new Array<boolean>(expectedText.chars.length).fill(false);
+    const pairedA = new Set<number>();
+    const pairedB = new Set<number>();
+    for (const [i, j] of pairs) {
+        pairedA.add(i);
+        pairedB.add(j);
+        const common = commonCharacters(
+            a[i].idx.map((k) => typedText.chars[k]),
+            b[j].idx.map((k) => expectedText.chars[k]),
+        );
+        a[i].idx.forEach((k, n) => (inA[k] = common.inA[n]));
+        b[j].idx.forEach((k, n) => (inB[k] = common.inB[n]));
+    }
+    // The space before a word goes with it
+    const spaces = (words: Word[], paired: Set<number>, marks: boolean[]) =>
+        words.forEach((w, n) => {
+            if (n > 0 && paired.has(n)) marks[w.idx[0] - 1] = true;
+        });
+    spaces(a, pairedA, inA);
+    spaces(b, pairedB, inB);
+    return { inA, inB, pairs: pairs.length, typedWords: a.length, answerWords: b.length };
+}
+
 function compareWhole(typed: string, expected: string, ignoreAccents: boolean): TypedComparison {
     const typedText = normalizeWithSource(typed, ignoreAccents);
     const expectedText = normalizeWithSource(expected, ignoreAccents);
-    const { inA, inB } = commonCharacters(typedText.chars, expectedText.chars);
+    const exact: boolean = typedText.chars.join("") === expectedText.chars.join("");
+    const letters = commonCharacters(typedText.chars, expectedText.chars);
+    const lettersMatched: number = letters.inA.filter(Boolean).length;
     const longer: number = Math.max(typedText.chars.length, expectedText.chars.length);
+
+    // Word by word, unless that loses much of what a plain letter match finds (words run
+    // together or split differently: "adjacencymatrix")
+    const words = markByWords(typedText, expectedText);
+    const allTypedPaired: boolean = words.typedWords > 0 && words.pairs === words.typedWords;
+    const useWords: boolean =
+        allTypedPaired || words.inA.filter(Boolean).length >= 0.8 * lettersMatched;
+    const { inA, inB } = useWords ? words : letters;
     return {
-        exact: typedText.chars.join("") === expectedText.chars.join(""),
-        similarity: longer === 0 ? 1 : inA.filter(Boolean).length / longer,
-        typedWordsInAnswer: wordsContained(typedText.chars.join(""), expectedText.chars.join("")),
+        exact,
+        similarity: longer === 0 ? 1 : lettersMatched / longer,
+        typedWordsInAnswer: allTypedPaired,
+        typosOnly: !exact && allTypedPaired && words.pairs === words.answerWords,
         typed: typedText.chars.length === 0 ? [] : diffParts(typedText, inA, "wrong"),
         expected: diffParts(expectedText, inB, "missing"),
     };
-}
-
-// A typed word counts as a word of the answer when it is one, or a near miss of one
-const WORD_CLOSE_ENOUGH = 0.75;
-
-// Whether every word of `typed` is a word of `expected`, or a close misspelling of one (both
-// already folded)
-function wordsContained(typed: string, expected: string): boolean {
-    const words = (text: string) => text.split(/[^\p{L}\p{N}]+/u).filter((w) => w !== "");
-    const typedWords = words(typed);
-    const expectedWords = words(expected);
-    const near = (a: string, b: string): boolean => {
-        if (a === b) return true;
-        if (Math.min(a.length, b.length) < 3) return false;
-        const a1 = Array.from(a);
-        const b1 = Array.from(b);
-        const matched = commonCharacters(a1, b1).inA.filter(Boolean).length;
-        return matched / Math.max(a1.length, b1.length) >= WORD_CLOSE_ENOUGH;
-    };
-    return typedWords.length > 0 && typedWords.every((w) => expectedWords.some((e) => near(w, e)));
 }

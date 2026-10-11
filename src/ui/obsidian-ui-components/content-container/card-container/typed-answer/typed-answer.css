@@ -70,6 +70,13 @@
     text-underline-offset: 3px;
 }
 
+/* Right but for typos: the slips in amber rather than red */
+.is-typo .sr-typed-wrong,
+.is-typo .sr-typed-missing {
+    color: var(--color-orange);
+    background-color: rgba(var(--color-orange-rgb), 0.15);
+}
+
 /* A cloze blank answered by typing: what was typed, then the expected answer when they differ */
 .sr-typed-cloze .sr-typed-expected {
     margin-inline-start: var(--size-4-1);

@@ -1,8 +1,10 @@
 import {
     CLOSE_ENOUGH,
     compareTypedAnswer,
+    editDistance,
     normalizeAnswer,
     typedAnswerTarget,
+    typoAllowance,
     worthMarking,
 } from "src/scheduling/typed-answer";
 
@@ -147,6 +149,7 @@ describe("compareTypedAnswer: more", () => {
             exact: true,
             similarity: 1,
             typedWordsInAnswer: false,
+            typosOnly: false,
             typed: [],
             expected: [],
         });
@@ -269,4 +272,66 @@ describe("worthMarking: a part of the answer typed word for word", () => {
 test("the earlier rephrased answer is still shown as typed", () => {
     const c = compareTypedAnswer("number of k step walks", "walks of length k from u to v", false);
     expect(worthMarking(c)).toBe(false);
+});
+
+describe("typos", () => {
+    test("edit distance counts a swap of neighbouring letters as one", () => {
+        const d = (a: string, b: string) => editDistance(Array.from(a), Array.from(b));
+        expect(d("matrix", "matrix")).toBe(0);
+        expect(d("matix", "matrix")).toBe(1);
+        expect(d("mtarix", "matrix")).toBe(1);
+        expect(d("kitten", "sitting")).toBe(3);
+    });
+
+    test("allowance grows with the word", () => {
+        expect([3, 4, 7, 8].map(typoAllowance)).toEqual([0, 1, 1, 2]);
+    });
+
+    test("a typo in each of several words is right, by typos only", () => {
+        const c = compareTypedAnswer("adjacensy matix", "adjacency matrix", false);
+        expect(c.exact).toBe(false);
+        expect(c.typosOnly).toBe(true);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "adjacen" },
+            { kind: "missing", text: "c" },
+            { kind: "ok", text: "y mat" },
+            { kind: "missing", text: "r" },
+            { kind: "ok", text: "ix" },
+        ]);
+    });
+
+    test("a short word must be exact", () => {
+        expect(compareTypedAnswer("cot", "cat", false).typosOnly).toBe(false);
+    });
+
+    test("too many slips (3 in a 9-letter word), a missing word or an extra one is not a typo", () => {
+        expect(compareTypedAnswer("ajcnsy matrix", "adjacency matrix", false).typosOnly).toBe(
+            false,
+        );
+        expect(compareTypedAnswer("adjacency", "adjacency matrix", false).typosOnly).toBe(false);
+        expect(
+            compareTypedAnswer("big adjacency matrix", "adjacency matrix", false).typosOnly,
+        ).toBe(false);
+    });
+
+    test("words are matched with words: a missing word is missing as a whole", () => {
+        const c = compareTypedAnswer("крона", "крона дерева", false);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "крона" },
+            { kind: "missing", text: " дерева" },
+        ]);
+        const extra = compareTypedAnswer("the crown", "crown", false);
+        expect(extra.typed).toEqual([
+            { kind: "wrong", text: "the" },
+            { kind: "ok", text: " crown" },
+        ]);
+    });
+
+    test("a typo in one alternative of several is right, by typos only", () => {
+        const c = compareTypedAnswer("tosklivy, glomy", "gloomy, sullen", false);
+        expect(c.typosOnly).toBe(false);
+        const t = compareTypedAnswer("glomy", "gloomy, sullen", false);
+        expect(t.typosOnly).toBe(true);
+        expect(t.alternative).toBe(true);
+    });
 });
