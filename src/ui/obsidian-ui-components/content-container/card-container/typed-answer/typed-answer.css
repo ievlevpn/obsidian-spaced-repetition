@@ -208,3 +208,8 @@
     padding: var(--size-4-1) var(--size-4-3);
     border-left: 2px solid var(--background-modifier-border);
 }
+
+/* The other alternatives of an answer, beside the one that was matched */
+.sr-typed-other {
+    color: var(--text-muted);
+}

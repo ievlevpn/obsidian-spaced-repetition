@@ -662,7 +662,8 @@ export class CardContainer {
             clozeAnswer.empty();
             clozeAnswer.addClass("sr-typed-cloze");
             addDiffParts(clozeAnswer.createSpan(), comparison.typed);
-            if (!comparison.exact) {
+            // A wrong answer, or one alternative of several: the whole answer follows
+            if (!comparison.exact || comparison.alternative) {
                 addDiffParts(clozeAnswer.createSpan("sr-typed-expected"), comparison.expected);
             }
         }
