@@ -55,7 +55,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT). Every other card
   (a long or multi-line answer, math, a cloze card whose blanks are all math) gets a free box,
   an Obsidian editor with live preview and latex-suite: Check (or Mod+Enter) shows what was typed
-  beside the answer, with nothing compared or suggested.
+  next to the answer (below by default; above, left or right in settings), with nothing compared
+  or suggested.
 - A quiet "new" / "seen" label on each card.
 - A thin progress line under the card toolbar (can be turned off in the settings).
 - In a cloze card taller than the view, the cloze being asked (and then its answer) is scrolled

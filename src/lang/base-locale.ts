@@ -318,6 +318,12 @@ export interface IBaseLocale {
     ANSWER_KEYS_DESC: string;
     ANSWER_KEYS_ANKI: string;
     ANSWER_KEYS_ORIGINAL: string;
+    TYPED_LAYOUT: string;
+    TYPED_LAYOUT_DESC: string;
+    TYPED_LAYOUT_BELOW: string;
+    TYPED_LAYOUT_ABOVE: string;
+    TYPED_LAYOUT_LEFT: string;
+    TYPED_LAYOUT_RIGHT: string;
 
     // sidebar.ts
     NOTES_REVIEW_QUEUE: string;

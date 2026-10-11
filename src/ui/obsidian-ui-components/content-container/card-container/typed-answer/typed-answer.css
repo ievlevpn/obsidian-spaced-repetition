@@ -149,16 +149,21 @@
     font-size: var(--font-ui-smaller);
 }
 
-/* Your answer | Answer, side by side; stacked when the card is narrow */
+/* Your answer and the answer: one above the other (below, above), or side by side (left,
+   right), stacking when the card is narrow. The DOM order follows the setting. */
 .sr-typed-compare {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    grid-template-columns: 1fr;
     gap: var(--size-4-4);
     width: 100%;
 
+    &.is-left,
+    &.is-right {
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    }
+
     &.is-single {
-        margin-top: var(--size-4-4);
-        grid-template-columns: 1fr;
+        margin: var(--size-4-4) 0;
     }
 }
 
@@ -174,7 +179,7 @@
     margin-bottom: var(--size-4-1);
 }
 
-.sr-typed-compare-col:first-child .sr-typed-compare-body {
+.sr-typed-compare-col.is-typed .sr-typed-compare-body {
     padding: var(--size-4-1) var(--size-4-3);
     border-left: 2px solid var(--background-modifier-border);
 }

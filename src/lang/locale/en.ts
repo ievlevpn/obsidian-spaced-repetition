@@ -387,6 +387,13 @@ const en: IBaseLocale = {
     ANSWER_KEYS_DESC: "Which number keys answer a card during review.",
     ANSWER_KEYS_ANKI: "Anki (1 Again, 2 Hard, 3 Good, 4 Easy)",
     ANSWER_KEYS_ORIGINAL: "Original (1 Hard, 2 Good, 3 Easy, 0 Reset)",
+    TYPED_LAYOUT: "Your typed answer",
+    TYPED_LAYOUT_DESC:
+        "Where a typed answer that is not checked letter by letter is shown, next to the true answer. Left and right stack (left on top) when the card is narrow.",
+    TYPED_LAYOUT_BELOW: "Below the answer",
+    TYPED_LAYOUT_ABOVE: "Above the answer",
+    TYPED_LAYOUT_LEFT: "Left of the answer",
+    TYPED_LAYOUT_RIGHT: "Right of the answer",
     NOTES_REVIEW_QUEUE: "Notes Review Queue",
     CLOSE: "Close",
     NEW: "New",
