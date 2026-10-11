@@ -8,9 +8,16 @@ export const MAX_TYPED_ANSWER_LENGTH = 120;
 // misspelling): what was typed is shown as it is, next to the answer
 export const CLOSE_ENOUGH = 0.6;
 
-/** Whether a comparison is worth marking letter by letter. */
+/**
+ * Whether a comparison is worth marking letter by letter: close enough overall, or a part of
+ * the answer typed right word for word ("крона" for "крона дерева").
+ */
 export function worthMarking(comparison: TypedComparison): boolean {
-    return comparison.exact || comparison.similarity >= CLOSE_ENOUGH;
+    return (
+        comparison.exact ||
+        comparison.similarity >= CLOSE_ENOUGH ||
+        comparison.typedWordsInAnswer === true
+    );
 }
 
 // A list item, a quote or callout, a table row, or an HTML tag or comment: not plain text
@@ -108,6 +115,8 @@ export interface TypedComparison {
     exact: boolean;
     // Matched letters over the longer of the two (0..1): how close the answer came
     similarity: number;
+    // Every typed word is a whole word of the answer: a part of it, typed right
+    typedWordsInAnswer?: boolean;
     // Matched against one of the answer's alternatives ("gloomy" in "gloomy, sullen")
     alternative?: boolean;
     typed: DiffPart[];
@@ -234,6 +243,7 @@ export function compareTypedAnswer(
         return {
             exact: false,
             similarity: comparison.similarity,
+            typedWordsInAnswer: comparison.typedWordsInAnswer,
             alternative: true,
             typed: comparison.typed,
             expected: withOtherParts(
@@ -276,7 +286,28 @@ function compareWhole(typed: string, expected: string, ignoreAccents: boolean): 
     return {
         exact: typedText.chars.join("") === expectedText.chars.join(""),
         similarity: longer === 0 ? 1 : inA.filter(Boolean).length / longer,
+        typedWordsInAnswer: wordsContained(typedText.chars.join(""), expectedText.chars.join("")),
         typed: typedText.chars.length === 0 ? [] : diffParts(typedText, inA, "wrong"),
         expected: diffParts(expectedText, inB, "missing"),
     };
+}
+
+// A typed word counts as a word of the answer when it is one, or a near miss of one
+const WORD_CLOSE_ENOUGH = 0.75;
+
+// Whether every word of `typed` is a word of `expected`, or a close misspelling of one (both
+// already folded)
+function wordsContained(typed: string, expected: string): boolean {
+    const words = (text: string) => text.split(/[^\p{L}\p{N}]+/u).filter((w) => w !== "");
+    const typedWords = words(typed);
+    const expectedWords = words(expected);
+    const near = (a: string, b: string): boolean => {
+        if (a === b) return true;
+        if (Math.min(a.length, b.length) < 3) return false;
+        const a1 = Array.from(a);
+        const b1 = Array.from(b);
+        const matched = commonCharacters(a1, b1).inA.filter(Boolean).length;
+        return matched / Math.max(a1.length, b1.length) >= WORD_CLOSE_ENOUGH;
+    };
+    return typedWords.length > 0 && typedWords.every((w) => expectedWords.some((e) => near(w, e)));
 }
