@@ -50,9 +50,19 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   on a slider (from due only to new only), due otherwise. From a deck's menu it asks for the
   chance each time; in settings it is a slider under the card order.
 - Type the answer: switched on per session from the card menu. A card with a short plain-text
-  answer gets a field, and text cloze blanks become fields (math clozes do not). The back marks
-  wrong and missing letters, and Good or Again is suggested. Ported from
-  [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT). Every other card
+  answer gets a field, and text cloze blanks become fields (math clozes do not). Ported from
+  [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT), with a smarter
+  comparison:
+  - word by word: words are paired with words and letters compared within a pair, so a missing
+    or extra word is marked as a whole;
+  - typos count as right: an extra, missing, wrong or swapped letter (none in words of up to 3
+    letters, 1 up to 7, 2 beyond) is marked in amber, and Good is suggested rather than Again;
+  - an answer listing alternatives (`gloomy, sullen; угрюмый`, split at `,` `;` `/`) accepts any
+    one of them, or several in any order;
+  - an answer far from the right one (a different phrasing), or a cloze blank with math, is not
+    marked letter by letter: what was typed is shown as it is, beside the answer.
+
+  Every other card
   (a long or multi-line answer, math, a cloze card whose blanks are all math) gets a free box,
   an Obsidian editor with live preview and latex-suite: Check (or Mod+Enter) shows what was typed
   next to the answer (below by default; above, left or right in settings), with nothing compared
@@ -77,8 +87,9 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 - Write notes on a card while reviewing; they are stored as a markdown footnote in the note,
   with dated entries.
 - The note box is a real Obsidian editor (live preview, editor plugins such as latex-suite).
-  Past notes can be edited or deleted, saved right away (`Ctrl/Cmd+Enter`), and long histories
-  are folded.
+  Past notes can be edited or deleted, saved right away (`Ctrl/Cmd+Enter`, shown beside the save
+  link), and long histories are folded. Esc leaves the box (and hands the review keys back)
+  rather than closing the review window.
 
 **Performance**
 
