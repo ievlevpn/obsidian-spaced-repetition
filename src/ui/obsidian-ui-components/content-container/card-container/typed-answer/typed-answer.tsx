@@ -2,7 +2,7 @@ import "src/ui/obsidian-ui-components/content-container/card-container/typed-ans
 import { setIcon } from "obsidian";
 
 import { t } from "src/lang/helpers";
-import { DiffPart, TypedComparison } from "src/scheduling/typed-answer";
+import { DiffPart, TypedComparison, worthMarking } from "src/scheduling/typed-answer";
 import { TextDirection } from "src/utils/strings";
 
 // The field and the result of typing the answer. Ported from Flashcard Studio
@@ -59,6 +59,12 @@ export function renderTypedResult(
     if (textDirection === TextDirection.Rtl) box.setAttribute("dir", "rtl");
     box.toggleClass("is-exact", comparison.exact);
     const typedLine = box.createDiv({ cls: "sr-typed-line" });
+    // A different phrasing: what was typed as it is; the answer follows on the card
+    if (!worthMarking(comparison)) {
+        typedLine.addClass("sr-typed-far");
+        typedLine.setText(comparison.typed.map((part) => part.text).join(""));
+        return box;
+    }
     addDiffParts(typedLine, comparison.typed);
     if (comparison.exact) {
         setIcon(typedLine.createSpan({ cls: "sr-typed-check" }), "check");

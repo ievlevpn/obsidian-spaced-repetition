@@ -15,6 +15,7 @@ import {
     compareTypedAnswer,
     typedAnswerTarget,
     TypedComparison,
+    worthMarking,
 } from "src/scheduling/typed-answer";
 import CardCommentComponent, {
     CardCommentInput,
@@ -643,6 +644,20 @@ export class CardContainer {
                 false,
             );
             allExact &&= comparison.exact;
+
+            // A different phrasing, or an answer with math (whose text the letters cannot
+            // follow): the answer stays as written, with what was typed beside it
+            const hasMath: boolean = clozeAnswer.querySelector("mjx-container, .math") !== null;
+            if (!comparison.exact && (hasMath || !worthMarking(comparison))) {
+                if (typed[i].trim() !== "") {
+                    clozeAnswer.createSpan({
+                        cls: "sr-typed-yours",
+                        text: typed[i].trim(),
+                        attr: { "aria-label": t("TYPED_YOUR_ANSWER") },
+                    });
+                }
+                continue;
+            }
 
             clozeAnswer.empty();
             clozeAnswer.addClass("sr-typed-cloze");
