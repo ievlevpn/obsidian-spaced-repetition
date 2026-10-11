@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment.css";
-import { App, Platform } from "obsidian";
+import { App, Platform, Scope } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
@@ -43,6 +43,10 @@ export default class CardCommentComponent {
     private isOpen: boolean = true;
     // Saves the box's content right away (Save link, Mod+Enter), without rating the card
     private onSave: () => Promise<void>;
+    // Pushed on Obsidian's keymap while the box has focus, so its Mod+Enter wins over the vault's
+    // own Mod+Enter hotkey (toggle checkbox), which would otherwise take the key first
+    private saveScope: Scope;
+    private saveScopePushed: boolean = false;
     private saveLink: HTMLAnchorElement;
     // "show N earlier notes" / "show fewer", only when there are more than VISIBLE_NOTES
     private moreLink: HTMLAnchorElement;
@@ -100,17 +104,17 @@ export default class CardCommentComponent {
             t("CARD_NOTE_PLACEHOLDER"),
         );
         this.inputEl = this.editor ? this.editor.el : this.createTextarea();
-        // Mod+Enter saves the note now (capture: ahead of the editor's own Enter handling)
-        this.inputEl.addEventListener(
-            "keydown",
-            (e: KeyboardEvent) => {
-                if (e.key !== "Enter" || !(e.metaKey || e.ctrlKey)) return;
-                e.preventDefault();
-                e.stopPropagation();
-                void this.onSave();
-            },
-            true,
-        );
+        // Mod+Enter saves the note now. App hotkeys (bold, italic, ...) still reach the editor
+        // through the scope's parent.
+        this.saveScope = new Scope(this.app.scope);
+        this.saveScope.register(["Mod"], "Enter", () => {
+            void this.onSave();
+            return false;
+        });
+        this.inputEl.addEventListener("focusin", () => this.pushSaveScope());
+        this.inputEl.addEventListener("focusout", (e: FocusEvent) => {
+            if (!this.inputEl.contains(e.relatedTarget as Node | null)) this.popSaveScope();
+        });
         this.setOpen(this.app.loadLocalStorage(BOX_OPEN_KEY) !== false, false);
     }
 
@@ -153,8 +157,21 @@ export default class CardCommentComponent {
         if (remember) this.app.saveLocalStorage(BOX_OPEN_KEY, open);
     }
 
+    private pushSaveScope(): void {
+        if (this.saveScopePushed) return;
+        this.app.keymap.pushScope(this.saveScope);
+        this.saveScopePushed = true;
+    }
+
+    private popSaveScope(): void {
+        if (!this.saveScopePushed) return;
+        this.app.keymap.popScope(this.saveScope);
+        this.saveScopePushed = false;
+    }
+
     /** Removes the embedded editor from the plugin; call when the review view closes. */
     public destroy(): void {
+        this.popSaveScope();
         this.editor?.destroy();
         this.editor = null;
     }
