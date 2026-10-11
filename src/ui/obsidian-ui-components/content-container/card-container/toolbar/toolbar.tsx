@@ -172,7 +172,8 @@ export default class CardToolbarComponent {
             currentDeckTotalCardsInQueue,
             currentDeckTotalCardsInQueue - currentDeckStats.cardsInQueueOfThisDeckCount,
             flashcardCardOrder === "EveryCardRandomDeckAndCard" ||
-                flashcardCardOrder === "DueFirstRandomDeckAndCard",
+                flashcardCardOrder === "DueFirstRandomDeckAndCard" ||
+                flashcardCardOrder === "DueNewMixedRandom",
         );
     }
 

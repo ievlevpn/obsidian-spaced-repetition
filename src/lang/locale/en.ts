@@ -61,6 +61,13 @@ const en: IBaseLocale = {
     ORDER_DUE_FIRST_RANDOM: "Due first, shuffled",
     ORDER_RANDOM_ALL: "Shuffled across all decks",
     ORDER_DUE_FIRST_RANDOM_ALL: "Due first, shuffled across all decks",
+    ORDER_DUE_NEW_MIXED: "Due and new mixed…",
+    MIXED_TITLE: "Due and new mixed",
+    MIXED_DESC:
+        "Each card is drawn at random from all decks: a new one with this chance, a due one otherwise. At the ends only that kind is shown; in between, once one kind runs out the other follows.",
+    MIXED_DUE_ONLY: "Due only",
+    MIXED_NEW_ONLY: "New only",
+    MIXED_START: "Start",
     CARD_NOTE_PLACEHOLDER: "Note to self…",
     CARD_NOTE_EDIT: "Edit this note",
     CARD_NOTE_EDIT_LINK: "edit",
@@ -212,6 +219,10 @@ const en: IBaseLocale = {
     REVIEW_CARD_ORDER_RANDOM_DECK_AND_CARD: "Random card from random deck",
     REVIEW_CARD_ORDER_DUE_FIRST_RANDOM_DECK_AND_CARD:
         "Random card from random deck (All due cards first)",
+    REVIEW_CARD_ORDER_DUE_NEW_MIXED: "Random card from random deck (Due and new mixed)",
+    REVIEW_NEW_PROBABILITY: "Chance of a new card",
+    REVIEW_NEW_PROBABILITY_DESC:
+        "For Due and new mixed: 0 shows due cards only, 100% new cards only. A deck's menu asks each time, starting from this value, and remembers the last one.",
     REVIEW_DECK_ORDER: "Order decks are displayed during review",
     REVIEW_DECK_ORDER_PREV_DECK_COMPLETE_SEQUENTIAL:
         "Sequentially (once all cards in previous deck reviewed)",

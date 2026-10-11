@@ -12,6 +12,8 @@ export enum RepItemOrder {
     DueFirstRandom,
     EveryCardRandomDeckAndCard,
     DueFirstRandomDeckAndCard,
+    // A random card from a random deck, new with probability newProbability, due otherwise
+    DueNewMixedRandom,
 }
 
 /**
@@ -24,7 +26,8 @@ export enum RepItemOrder {
 export function isRandomDeckAndCardOrder(order: RepItemOrder): boolean {
     return (
         order === RepItemOrder.EveryCardRandomDeckAndCard ||
-        order === RepItemOrder.DueFirstRandomDeckAndCard
+        order === RepItemOrder.DueFirstRandomDeckAndCard ||
+        order === RepItemOrder.DueNewMixedRandom
     );
 }
 export enum DeckOrder {
@@ -38,14 +41,18 @@ export enum DeckOrder {
  *
  * @param cardOrder - A RepItemOrder name, e.g. "NewFirstSequential"
  * @param deckOrder - A DeckOrder name
+ * @param importantFirst - Important cards first within each pool
+ * @param newProbability - For DueNewMixedRandom: the chance that a card is drawn from the new ones
  */
 export function iteratorOrderFromNames(
     cardOrder: string,
     deckOrder: string,
     importantFirst: boolean = false,
+    newProbability: number = DEFAULT_NEW_PROBABILITY,
 ): IIteratorOrder {
     return {
         importantFirst,
+        newProbability,
         repItemOrder:
             RepItemOrder[cardOrder as keyof typeof RepItemOrder] ?? RepItemOrder.DueFirstSequential,
         deckOrder:
@@ -63,6 +70,27 @@ export interface IIteratorOrder {
 
     // Within each pool of cards the order draws from, important cards come first
     importantFirst?: boolean;
+
+    // DueNewMixedRandom: the chance (0..1) that the next card is a new one. 0 shows due cards
+    // only, 1 new cards only; in between, once one kind runs out the other is drawn.
+    newProbability?: number;
+}
+
+export const DEFAULT_NEW_PROBABILITY = 0.5;
+
+/**
+ * The pools a DueNewMixedRandom draw tries, in turn: new first with probability `p`, else due.
+ * At the ends only one pool is tried, so 0 never shows a new card and 1 never a due one.
+ *
+ * @param p - Chance of a new card
+ * @param coin - Draws an integer uniformly from 0..999 (only called when 0 < p < 1)
+ */
+export function mixedDrawPools(p: number, coin: () => number): RepItemState[] {
+    if (p <= 0) return [RepItemState.DueItem];
+    if (p >= 1) return [RepItemState.NewItem];
+    return coin() < p * 1000
+        ? [RepItemState.NewItem, RepItemState.DueItem]
+        : [RepItemState.DueItem, RepItemState.NewItem];
 }
 
 /**
@@ -506,10 +534,16 @@ export class DeckTreeIterator implements IDeckTreeIterator {
         // DueFirstRandomDeckAndCard exhausts the due cards of the whole subtree before touching any
         // new card; EveryCardRandomDeckAndCard treats both as one pool. Within whichever pool is
         // active, every card is equally likely regardless of which deck holds it.
-        const states: RepItemState[] =
-            this.iteratorOrder.repItemOrder === RepItemOrder.DueFirstRandomDeckAndCard
-                ? [RepItemState.DueItem, RepItemState.NewItem]
-                : [RepItemState.AnyItem];
+        // DueNewMixedRandom draws new or due by its probability, falling back to the other.
+        let states: RepItemState[] = [RepItemState.AnyItem];
+        if (this.iteratorOrder.repItemOrder === RepItemOrder.DueFirstRandomDeckAndCard) {
+            states = [RepItemState.DueItem, RepItemState.NewItem];
+        } else if (this.iteratorOrder.repItemOrder === RepItemOrder.DueNewMixedRandom) {
+            states = mixedDrawPools(
+                this.iteratorOrder.newProbability ?? DEFAULT_NEW_PROBABILITY,
+                () => globalRandomNumberProvider.getInteger(0, 999),
+            );
+        }
 
         for (const state of states) {
             // Important cards first: while any is left in this pool, draw only among them
