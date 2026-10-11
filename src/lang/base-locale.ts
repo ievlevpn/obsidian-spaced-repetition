@@ -29,6 +29,9 @@ export interface IBaseLocale {
     CARD_STATUS_IMPORTANT_HINT: string;
     TYPE_ANSWERS: string;
     TYPED_ANSWER_PLACEHOLDER: string;
+    TYPED_FREE_CHECK: string;
+    TYPED_YOUR_ANSWER: string;
+    TYPED_TRUE_ANSWER: string;
     REVIEW_IMPORTANT_CARDS: string;
     NO_IMPORTANT_CARDS: string;
     SUSPENDED_CARDS: string;
