@@ -25,6 +25,7 @@ import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-cont
 import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
 import { CardMarkerActions } from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar-buttons/card-menu-button";
+import { FreeAnswerBox } from "src/ui/obsidian-ui-components/content-container/card-container/typed-answer/free-answer";
 import {
     addDiffParts,
     renderTypedInput,
@@ -75,6 +76,8 @@ export class CardContainer {
     private typeAnswers: boolean = false;
     private typedInput: HTMLInputElement | null = null;
     private typedTarget: string | null = null;
+    // While typing answers, the box for an answer that cannot be checked letter by letter
+    private freeAnswer: FreeAnswerBox | null = null;
     // The card menu's "Important" and "Suspend card", also behind the I key
     private markerActions: CardMarkerActions | null = null;
     // The arguments of the last drawCardFront, so switching typing on redraws the card
@@ -228,6 +231,7 @@ export class CardContainer {
 
     /** Releases what outlives the view (the comment box's embedded editor, swipe listeners). */
     destroy(): void {
+        this.destroyFreeAnswer();
         this.cardComment.destroy();
         this.detachSwipes.forEach((detach) => detach());
         this.detachSwipes = [];
@@ -416,20 +420,43 @@ export class CardContainer {
         return null;
     }
 
-    // A field under the question of a non-cloze card whose answer is short plain text
+    // A field under the question of a non-cloze card whose answer is short plain text; for any
+    // other card (and a cloze card whose blanks are all math, so have no fields), a free box
     private drawTypedInput(sessionData: SessionData, settings: SRSettings): void {
         this.typedInput = null;
         this.typedTarget = null;
-        if (!this.typeAnswers || sessionData.currentQuestion.questionType === CardType.Cloze) {
+        this.destroyFreeAnswer();
+        if (!this.typeAnswers) return;
+        if (sessionData.currentQuestion.questionType === CardType.Cloze) {
+            if (this.content.querySelector(".cloze-input") === null) {
+                this.drawFreeAnswer(sessionData);
+            }
             return;
         }
         this.typedTarget = typedAnswerTarget(this.cardSides(sessionData, settings).back);
-        if (this.typedTarget === null) return;
+        if (this.typedTarget === null) {
+            this.drawFreeAnswer(sessionData);
+            return;
+        }
         this.typedInput = renderTypedInput(this.content, {
             onSubmit: () => this.showAnswerHandler(),
             textDirection: sessionData.currentQuestion.questionText.textDirection,
         });
         this.typedInput.focus();
+    }
+
+    private drawFreeAnswer(sessionData: SessionData): void {
+        this.freeAnswer = new FreeAnswerBox(this.app, this.plugin, this.content, {
+            notePath: sessionData.currentNote.filePath,
+            onCheck: () => this.showAnswerHandler(),
+            textDirection: sessionData.currentQuestion.questionText.textDirection,
+        });
+        this.freeAnswer.focus();
+    }
+
+    private destroyFreeAnswer(): void {
+        this.freeAnswer?.destroy();
+        this.freeAnswer = null;
     }
 
     private drawCardContext(sessionData: SessionData, settings: SRSettings) {
@@ -644,6 +671,16 @@ export class CardContainer {
         this.typedInput = null;
         this.typedTarget = null;
         let typedExact: boolean | null = null;
+        const freeText: string = (this.freeAnswer?.text ?? "").trim();
+        this.destroyFreeAnswer();
+        const wrapper: RenderMarkdownWrapper = new RenderMarkdownWrapper(
+            this.app,
+            this.plugin,
+            sessionData.currentNote.filePath,
+        );
+        const textDirection = sessionData.currentQuestion.questionText.textDirection;
+        // Where the answer goes: the card, or the right column beside what was typed
+        let answerEl: HTMLElement = this.content;
 
         // Show answer text
         if (sessionData.currentQuestion.questionType !== CardType.Cloze) {
@@ -659,27 +696,35 @@ export class CardContainer {
                     sessionData.currentQuestion.questionText.textDirection,
                 );
             }
+            if (freeText !== "") {
+                const compare: HTMLElement = this.content.createDiv("sr-typed-compare");
+                const typedCol: HTMLElement = this.typedColumn(compare, t("TYPED_YOUR_ANSWER"));
+                await wrapper.renderMarkdownWrapper(freeText, typedCol, textDirection);
+                answerEl = this.typedColumn(compare, t("TYPED_TRUE_ANSWER"));
+            }
         } else {
             this.content.empty();
             this.drawCardStatus(sessionData);
             this.drawCardContext(sessionData, settings);
         }
 
-        const wrapper: RenderMarkdownWrapper = new RenderMarkdownWrapper(
-            this.app,
-            this.plugin,
-            sessionData.currentNote.filePath,
-        );
         await wrapper.renderMarkdownWrapper(
             removeCommonIndent(this.cardSides(sessionData, settings).back),
-            this.content,
-            sessionData.currentQuestion.questionText.textDirection,
-            // sessionData.cardData.currentCardState,
+            answerEl,
+            textDirection,
         );
 
         // Evaluate cloze answers
         if (sessionData.currentQuestion.questionType === CardType.Cloze) {
             typedExact = this._evaluateClozeAnswers();
+            // What was typed for a cloze card without fields, under the revealed card
+            if (freeText !== "") {
+                const typedCol: HTMLElement = this.typedColumn(
+                    this.content.createDiv("sr-typed-compare is-single"),
+                    t("TYPED_YOUR_ANSWER"),
+                );
+                await wrapper.renderMarkdownWrapper(freeText, typedCol, textDirection);
+            }
             this.scrollToAskedCloze();
         }
 
@@ -723,6 +768,13 @@ export class CardContainer {
         if (this.plugin.uiManager === null) throw new Error("UI manager not initialized!!!");
         this.plugin.uiManager.setSRViewInFocus(true);
         this.response.againButton.buttonEl.focus();
+    }
+
+    // One column of the typed answer beside the true one, with its small label
+    private typedColumn(parent: HTMLElement, label: string): HTMLElement {
+        const col: HTMLElement = parent.createDiv("sr-typed-compare-col");
+        col.createDiv({ cls: "sr-typed-compare-label", text: label });
+        return col.createDiv("sr-typed-compare-body");
     }
 
     private _keydownHandler = (e: KeyboardEvent) => {
