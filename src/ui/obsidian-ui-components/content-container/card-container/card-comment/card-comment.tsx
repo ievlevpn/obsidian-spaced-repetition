@@ -43,8 +43,9 @@ export default class CardCommentComponent {
     private isOpen: boolean = true;
     // Saves the box's content right away (Save link, Mod+Enter), without rating the card
     private onSave: () => Promise<void>;
-    // Pushed on Obsidian's keymap while the box has focus, so its Mod+Enter wins over the vault's
-    // own Mod+Enter hotkey (toggle checkbox), which would otherwise take the key first
+    // Pushed on Obsidian's keymap while the box has focus, so its keys win over hotkeys that
+    // Obsidian's keymap would otherwise handle first: the vault's Mod+Enter (toggle checkbox),
+    // and the review window's Esc (close)
     private saveScope: Scope;
     private saveScopePushed: boolean = false;
     private saveLink: HTMLAnchorElement;
@@ -114,6 +115,12 @@ export default class CardCommentComponent {
         this.saveScope = new Scope(this.app.scope);
         this.saveScope.register(["Mod"], "Enter", () => {
             void this.onSave();
+            return false;
+        });
+        // Esc leaves the box, handing the review keys back, instead of closing the window
+        this.saveScope.register([], "Escape", () => {
+            const focused = this.inputEl.doc.activeElement;
+            if (focused instanceof HTMLElement && this.inputEl.contains(focused)) focused.blur();
             return false;
         });
         this.inputEl.addEventListener("focusin", () => this.pushSaveScope());
