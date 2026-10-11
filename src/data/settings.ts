@@ -5,6 +5,9 @@ import { AnswerKeys } from "src/scheduling/answer-keys";
 import { pathMatchesPattern } from "src/utils/fs";
 
 // What pulling a card down does on mobile
+// Where a free typed answer is shown on the back, relative to the true answer
+export type TypedAnswerLayout = "below" | "above" | "left" | "right";
+
 export type PullDownAction = "off" | "menu" | "important" | "bury" | "suspend";
 
 export interface SRSettings {
@@ -84,6 +87,8 @@ export interface SRSettings {
     // Number keys during review: "original" (1 Hard, 2 Good, 3 Easy, 0 Reset) or "anki" (1 Again,
     // 2 Hard, 3 Good, 4 Easy)
     answerKeys: AnswerKeys;
+    // Where a free typed answer is shown, relative to the true answer
+    typedAnswerLayout: TypedAnswerLayout;
     // The thin progress line under the card toolbar
     showProgressBar: boolean;
     useCalloutsForSchedulingComments: boolean;
@@ -185,6 +190,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     mobilePullDownAction: "menu",
     useCustomHotkeys: false,
     answerKeys: "original",
+    typedAnswerLayout: "below",
     showProgressBar: true,
     useCalloutsForSchedulingComments: false,
 

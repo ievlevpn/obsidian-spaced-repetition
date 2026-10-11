@@ -40,7 +40,7 @@ import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { attachPullDown } from "src/utils/pull-down";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
-import { removeCommonIndent } from "src/utils/strings";
+import { removeCommonIndent, TextDirection } from "src/utils/strings";
 
 // The colour the asked cloze and its answer are drawn in (#2196f3), as the browser reports it
 const ASKED_CLOZE_COLOR = "rgb(33, 150, 243)";
@@ -697,15 +697,32 @@ export class CardContainer {
                 );
             }
             if (freeText !== "") {
-                const compare: HTMLElement = this.content.createDiv("sr-typed-compare");
-                const typedCol: HTMLElement = this.typedColumn(compare, t("TYPED_YOUR_ANSWER"));
+                // Your answer and the answer, in the order and direction of the setting
+                const layout = settings.typedAnswerLayout;
+                const compare: HTMLElement = this.content.createDiv(
+                    `sr-typed-compare is-${layout}`,
+                );
+                const typedFirst: boolean = layout === "above" || layout === "left";
+                if (!typedFirst) answerEl = this.typedColumn(compare, t("TYPED_TRUE_ANSWER"));
+                const typedCol: HTMLElement = this.typedColumn(
+                    compare,
+                    t("TYPED_YOUR_ANSWER"),
+                    true,
+                );
                 await wrapper.renderMarkdownWrapper(freeText, typedCol, textDirection);
-                answerEl = this.typedColumn(compare, t("TYPED_TRUE_ANSWER"));
+                if (typedFirst) answerEl = this.typedColumn(compare, t("TYPED_TRUE_ANSWER"));
             }
         } else {
             this.content.empty();
             this.drawCardStatus(sessionData);
             this.drawCardContext(sessionData, settings);
+            // A cloze card's answer is the whole card: what was typed goes above it (above,
+            // left) or under it (below, right)
+            const typedFirst: boolean =
+                settings.typedAnswerLayout === "above" || settings.typedAnswerLayout === "left";
+            if (freeText !== "" && typedFirst) {
+                await this.drawClozeTypedPanel(freeText, wrapper, textDirection);
+            }
         }
 
         await wrapper.renderMarkdownWrapper(
@@ -717,13 +734,10 @@ export class CardContainer {
         // Evaluate cloze answers
         if (sessionData.currentQuestion.questionType === CardType.Cloze) {
             typedExact = this._evaluateClozeAnswers();
-            // What was typed for a cloze card without fields, under the revealed card
-            if (freeText !== "") {
-                const typedCol: HTMLElement = this.typedColumn(
-                    this.content.createDiv("sr-typed-compare is-single"),
-                    t("TYPED_YOUR_ANSWER"),
-                );
-                await wrapper.renderMarkdownWrapper(freeText, typedCol, textDirection);
+            const typedFirst: boolean =
+                settings.typedAnswerLayout === "above" || settings.typedAnswerLayout === "left";
+            if (freeText !== "" && !typedFirst) {
+                await this.drawClozeTypedPanel(freeText, wrapper, textDirection);
             }
             this.scrollToAskedCloze();
         }
@@ -770,9 +784,24 @@ export class CardContainer {
         this.response.againButton.buttonEl.focus();
     }
 
+    // What was typed for a cloze card without fields, as a panel of its own
+    private async drawClozeTypedPanel(
+        freeText: string,
+        wrapper: RenderMarkdownWrapper,
+        textDirection: TextDirection,
+    ): Promise<void> {
+        const typedCol: HTMLElement = this.typedColumn(
+            this.content.createDiv("sr-typed-compare is-single"),
+            t("TYPED_YOUR_ANSWER"),
+            true,
+        );
+        await wrapper.renderMarkdownWrapper(freeText, typedCol, textDirection);
+    }
+
     // One column of the typed answer beside the true one, with its small label
-    private typedColumn(parent: HTMLElement, label: string): HTMLElement {
+    private typedColumn(parent: HTMLElement, label: string, typed = false): HTMLElement {
         const col: HTMLElement = parent.createDiv("sr-typed-compare-col");
+        col.toggleClass("is-typed", typed);
         col.createDiv({ cls: "sr-typed-compare-label", text: label });
         return col.createDiv("sr-typed-compare-body");
     }

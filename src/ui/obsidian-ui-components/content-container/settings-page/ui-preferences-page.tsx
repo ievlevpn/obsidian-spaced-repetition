@@ -1,7 +1,7 @@
 import { Platform, Setting, SettingGroup } from "obsidian";
 
 import { DataManager } from "src/data/data-manager";
-import { DEFAULT_SETTINGS } from "src/data/settings";
+import { DEFAULT_SETTINGS, TypedAnswerLayout } from "src/data/settings";
 import { SettingsManager } from "src/data/settings-manager";
 import { t } from "src/lang/helpers";
 import SRPlugin from "src/main";
@@ -111,6 +111,24 @@ export class UIPreferencesPage extends SettingsPage {
                             .setValue(this.settingsManager.settings.showProgressBar)
                             .onChange(async (value) => {
                                 this.settingsManager.settings.showProgressBar = value;
+                                await this.settingsManager.save();
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName(t("TYPED_LAYOUT"))
+                    .setDesc(t("TYPED_LAYOUT_DESC"))
+                    .addDropdown((dropdown) =>
+                        dropdown
+                            .addOption("below", t("TYPED_LAYOUT_BELOW"))
+                            .addOption("above", t("TYPED_LAYOUT_ABOVE"))
+                            .addOption("left", t("TYPED_LAYOUT_LEFT"))
+                            .addOption("right", t("TYPED_LAYOUT_RIGHT"))
+                            .setValue(this.settingsManager.settings.typedAnswerLayout)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.typedAnswerLayout =
+                                    value as TypedAnswerLayout;
                                 await this.settingsManager.save();
                             }),
                     );
