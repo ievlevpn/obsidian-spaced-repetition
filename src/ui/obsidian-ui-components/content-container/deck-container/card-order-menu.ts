@@ -14,6 +14,8 @@ const CARD_ORDERS: [string, keyof IBaseLocale][] = [
     ["DueFirstRandom", "ORDER_DUE_FIRST_RANDOM"],
     ["EveryCardRandomDeckAndCard", "ORDER_RANDOM_ALL"],
     ["DueFirstRandomDeckAndCard", "ORDER_DUE_FIRST_RANDOM_ALL"],
+    // Asks for the chance of a new card before the review starts
+    ["DueNewMixedRandom", "ORDER_DUE_NEW_MIXED"],
 ];
 
 /**
@@ -22,6 +24,8 @@ const CARD_ORDERS: [string, keyof IBaseLocale][] = [
  */
 export interface DeckReviewOptions {
     cardOrder?: string;
+    // For DueNewMixedRandom: the chance of a new card; asked for when missing
+    newProbability?: number;
     importantOnly?: boolean;
 }
 

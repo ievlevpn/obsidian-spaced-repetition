@@ -3,6 +3,7 @@ import {
     DeckOrder,
     DeckTreeIterator,
     iteratorOrderFromNames,
+    mixedDrawPools,
     RepItemOrder,
 } from "src/data/data-structures/deck/deck-tree-iterator";
 import { TopicPath } from "src/data/data-structures/deck/topic-path";
@@ -838,6 +839,62 @@ Q3::A3`;
             repItemOrder: RepItemOrder.DueFirstSequential,
             deckOrder: DeckOrder.PrevDeckComplete_Sequential,
             importantFirst: false,
+            newProbability: 0.5,
         });
+    });
+});
+
+describe("RepItemOrder.DueNewMixedRandom", () => {
+    // Q2 (#flashcards) and Q4 (#flashcards/science) are due; Q1, Q3, Q5, Q6 are new.
+    const text: string = `
+#flashcards Q1::A1
+#flashcards Q2::A2 <!--SR:!2023-09-02,4,270-->
+#flashcards Q3::A3
+
+#flashcards/science Q4::A4 <!--SR:!2023-09-02,4,270-->
+#flashcards/science Q5::A5
+
+#flashcards/science/physics Q6::A6
+                        `;
+
+    async function drain(newProbability: number): Promise<string[]> {
+        const deck: Deck = await SampleItemDecks.createDeckFromText(text, TopicPath.emptyPath);
+        const iterator = new DeckTreeIterator(
+            iteratorOrderFromNames(
+                "DueNewMixedRandom",
+                "PrevDeckComplete_Sequential",
+                false,
+                newProbability,
+            ),
+            deck,
+        );
+        iterator.setIteratorTopicPath(TopicPath.getTopicPathFromTag("#flashcards"));
+        // Index 0 of every draw, so the order is deterministic
+        setupNextRandomNumber({ lower: 0, upper: 0, next: 0 });
+        const order: string[] = [];
+        while (iterator.nextRepItem()) order.push(iterator.currentRepItem.front);
+        return order;
+    }
+
+    test("0: due cards only, and the session ends when they do", async () => {
+        expect(await drain(0)).toEqual(["Q2", "Q4"]);
+    });
+
+    test("1: new cards only", async () => {
+        expect(await drain(1)).toEqual(["Q1", "Q3", "Q5", "Q6"]);
+    });
+
+    test("in between: once one kind runs out, the other follows", async () => {
+        // The static provider answers 0 to the 0..999 coin, so every draw prefers new cards
+        expect(await drain(0.5)).toEqual(["Q1", "Q3", "Q5", "Q6", "Q2", "Q4"]);
+    });
+
+    test("the coin picks new with the given chance", () => {
+        const pools = (p: number, coin: number) => mixedDrawPools(p, () => coin)[0];
+        expect(pools(0.3, 299)).toBe(RepItemState.NewItem);
+        expect(pools(0.3, 300)).toBe(RepItemState.DueItem);
+        expect(pools(0.3, 999)).toBe(RepItemState.DueItem);
+        expect(mixedDrawPools(0, () => 0)).toEqual([RepItemState.DueItem]);
+        expect(mixedDrawPools(1, () => 999)).toEqual([RepItemState.NewItem]);
     });
 });

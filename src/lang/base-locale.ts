@@ -54,6 +54,12 @@ export interface IBaseLocale {
     ORDER_DUE_FIRST_RANDOM: string;
     ORDER_RANDOM_ALL: string;
     ORDER_DUE_FIRST_RANDOM_ALL: string;
+    ORDER_DUE_NEW_MIXED: string;
+    MIXED_TITLE: string;
+    MIXED_DESC: string;
+    MIXED_DUE_ONLY: string;
+    MIXED_NEW_ONLY: string;
+    MIXED_START: string;
     CARD_NOTE_PLACEHOLDER: string;
     CARD_NOTE_EDIT: string;
     CARD_NOTE_EDIT_LINK: string;
@@ -181,6 +187,9 @@ export interface IBaseLocale {
     REVIEW_CARD_ORDER_DUE_FIRST_RANDOM: string;
     REVIEW_CARD_ORDER_RANDOM_DECK_AND_CARD: string;
     REVIEW_CARD_ORDER_DUE_FIRST_RANDOM_DECK_AND_CARD: string;
+    REVIEW_CARD_ORDER_DUE_NEW_MIXED: string;
+    REVIEW_NEW_PROBABILITY: string;
+    REVIEW_NEW_PROBABILITY_DESC: string;
     REVIEW_DECK_ORDER: string;
     REVIEW_DECK_ORDER_PREV_DECK_COMPLETE_SEQUENTIAL: string;
     REVIEW_DECK_ORDER_PREV_DECK_COMPLETE_RANDOM: string;

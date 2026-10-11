@@ -46,6 +46,9 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   brings a buried card back.
 - A "due first, then random" card order, and a menu on each deck (right-click, or long-press on a
   phone) to review it in another card order for one session.
+- "Due and new mixed" card order: each card drawn at random from all decks, new with a chance set
+  on a slider (from due only to new only), due otherwise. From a deck's menu it asks for the
+  chance each time; in settings it is a slider under the card order.
 - Type the answer: switched on per session from the card menu. A card with a short plain-text
   answer gets a field, and text cloze blanks become fields (math clozes do not). The back marks
   wrong and missing letters, and Good or Again is suggested. Ported from

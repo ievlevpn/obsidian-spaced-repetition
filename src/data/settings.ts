@@ -15,6 +15,8 @@ export interface SRSettings {
     burySiblingCards: boolean;
     randomizeCardOrder: boolean | undefined;
     flashcardCardOrder: string;
+    // Card order "Due/new mixed": the chance (0..1) that the next card is a new one
+    flashcardNewProbability: number;
     flashcardDeckOrder: string;
     convertClozePatternsToInputs: boolean;
     convertHighlightsToClozes: boolean;
@@ -121,6 +123,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     convertFoldersToDecks: false,
     burySiblingCards: false,
     flashcardCardOrder: "DueFirstRandom",
+    flashcardNewProbability: 0.5,
     flashcardDeckOrder: "PrevDeckComplete_Sequential",
     convertClozePatternsToInputs: false,
     convertHighlightsToClozes: true,

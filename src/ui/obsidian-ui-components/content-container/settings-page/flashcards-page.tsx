@@ -148,6 +148,7 @@ export class FlashcardsPage extends SettingsPage {
                             DueFirstRandomDeckAndCard: t(
                                 "REVIEW_CARD_ORDER_DUE_FIRST_RANDOM_DECK_AND_CARD",
                             ),
+                            DueNewMixedRandom: t("REVIEW_CARD_ORDER_DUE_NEW_MIXED"),
                         })
                         .setValue(this.settingsManager.settings.flashcardCardOrder)
                         .onChange(async (value) => {
@@ -158,10 +159,35 @@ export class FlashcardsPage extends SettingsPage {
                 );
             })
             .addSetting((setting: Setting) => {
+                // Due and new mixed: the chance of a new card (shown only for that order)
+                if (this.settingsManager.settings.flashcardCardOrder !== "DueNewMixedRandom") {
+                    setting.settingEl.addClass("sr-is-hidden");
+                    return;
+                }
+                setting
+                    .setName(t("REVIEW_NEW_PROBABILITY"))
+                    .setDesc(t("REVIEW_NEW_PROBABILITY_DESC"))
+                    .addSlider((slider) =>
+                        slider
+                            .setLimits(0, 100, 5)
+                            .setValue(
+                                Math.round(
+                                    this.settingsManager.settings.flashcardNewProbability * 100,
+                                ),
+                            )
+                            .setDynamicTooltip()
+                            .onChange(async (value: number) => {
+                                this.settingsManager.settings.flashcardNewProbability = value / 100;
+                                await this.settingsManager.save();
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
                 // The random-deck-and-card orders pick a deck per card, so Deck order is meaningless
                 const deckOrderEnabled: boolean = ![
                     "EveryCardRandomDeckAndCard",
                     "DueFirstRandomDeckAndCard",
+                    "DueNewMixedRandom",
                 ].includes(this.settingsManager.settings.flashcardCardOrder);
                 setting.setName(t("REVIEW_DECK_ORDER")).addDropdown((dropdown) =>
                     dropdown

@@ -130,6 +130,7 @@ export class ReviewQueueLoader {
             settings.flashcardCardOrder,
             settings.flashcardDeckOrder,
             settings.importantFirst,
+            settings.flashcardNewProbability,
         );
         return new DeckTreeIterator(iteratorOrder, null);
     }

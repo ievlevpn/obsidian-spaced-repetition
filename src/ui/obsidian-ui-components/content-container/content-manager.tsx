@@ -23,6 +23,7 @@ import { DeckReviewOptions } from "src/ui/obsidian-ui-components/content-contain
 import { DeckContainer } from "src/ui/obsidian-ui-components/content-container/deck-container/deck-container";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { FlashcardEditModal } from "src/ui/obsidian-ui-components/modals/edit-modal";
+import { MixedOrderModal } from "src/ui/obsidian-ui-components/modals/mixed-order-modal";
 import { SuspendedCardsModal } from "src/ui/obsidian-ui-components/modals/suspended-cards-modal";
 import { ReviewQueueLoader } from "src/ui/review-queue-loader";
 import { UIManager, UIState } from "src/ui/ui-manager";
@@ -638,6 +639,20 @@ export default class ContentManager {
             await this._startImportantReview(deck);
             return;
         }
+        let newProbability: number | undefined = options.newProbability;
+        // "Due and new mixed" picked from a deck's menu: ask for the chance of a new card, and
+        // remember it as the next starting point (and the setting's value)
+        if (options.cardOrder === "DueNewMixedRandom" && newProbability === undefined) {
+            const chosen: number | null = await MixedOrderModal.ask(
+                this.app,
+                this.settings.flashcardNewProbability,
+            );
+            if (chosen === null) return;
+            newProbability = chosen;
+            this.settings.flashcardNewProbability = chosen;
+            this.dataManager.settingsManager.settings.flashcardNewProbability = chosen;
+            await this.dataManager.settingsManager.save();
+        }
         this.cardContainer.resetTypeAnswers();
         this.sessionCardOrder = options.cardOrder ?? this.settings.flashcardCardOrder;
         this.reviewSequencer.setCardOrder(
@@ -645,6 +660,7 @@ export default class ContentManager {
                 this.sessionCardOrder,
                 this.settings.flashcardDeckOrder,
                 this.settings.importantFirst,
+                newProbability ?? this.settings.flashcardNewProbability,
             ),
         );
         this.reviewSequencer.setCurrentDeck(deck.getTopicPath());

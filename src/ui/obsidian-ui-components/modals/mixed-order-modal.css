@@ -1,0 +1,33 @@
+/* "Due and new mixed": the chance of a new card, on a slider between its two ends */
+.sr-mixed-desc {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+    margin-bottom: var(--size-4-4);
+}
+
+.sr-mixed-value {
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    margin-bottom: var(--size-4-2);
+}
+
+.sr-mixed-row {
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-3);
+}
+
+.sr-mixed-slider {
+    flex: 1;
+    display: flex;
+
+    & input[type="range"] {
+        width: 100%;
+    }
+}
+
+.sr-mixed-end {
+    flex-shrink: 0;
+    font-size: var(--font-ui-smaller);
+    color: var(--text-muted);
+}
