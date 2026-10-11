@@ -84,6 +84,11 @@ export default class CardCommentComponent {
         this.editingLine.addClasses(["sr-card-comment-editing", "sr-is-hidden"]);
         this.saveLink = bar.createEl("a", { text: t("CARD_NOTE_SAVE") });
         this.saveLink.addClass("sr-card-comment-save");
+        // Its shortcut beside it, in the platform's symbols (hidden on phones: no keyboard)
+        this.saveLink.createSpan({
+            cls: "sr-card-comment-save-key",
+            text: Platform.isMacOS ? "⌘↵" : "Ctrl+↵",
+        });
         this.saveLink.ariaLabel = t("CARD_NOTE_SAVE_HINT");
         this.saveLink.addEventListener("click", (e: MouseEvent) => {
             e.preventDefault();

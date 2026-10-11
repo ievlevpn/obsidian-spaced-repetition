@@ -67,7 +67,7 @@ const en: IBaseLocale = {
     CARD_NOTE_HIDE_BOX: "hide note box",
     CARD_NOTE_ADD: "add note",
     CARD_NOTE_SAVE: "save",
-    CARD_NOTE_SAVE_HINT: "Save this note now (Ctrl/Cmd+Enter)",
+    CARD_NOTE_SAVE_HINT: "Save this note now",
     CARD_NOTE_SHOW_EARLIER: "show ${count} earlier notes",
     CARD_NOTE_SHOW_EARLIER_ONE: "show 1 earlier note",
     CARD_NOTE_SHOW_FEWER: "show fewer",

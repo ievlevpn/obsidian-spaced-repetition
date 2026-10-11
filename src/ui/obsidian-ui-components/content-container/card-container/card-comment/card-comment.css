@@ -93,6 +93,26 @@
     }
 }
 
+.sr-card-comment-save-key {
+    /* inline-block: the link's hover underline does not run through the badge */
+    display: inline-block;
+    margin-left: var(--size-4-1);
+    padding: 0 var(--size-2-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smallest);
+    color: var(--text-faint);
+    font-family: var(--font-interface);
+}
+
+.sr-card-comment-save:hover .sr-card-comment-save-key {
+    color: var(--text-muted);
+}
+
+.is-phone .sr-card-comment-save-key {
+    display: none;
+}
+
 .sr-card-comment-save + .sr-card-comment-toggle:not(.sr-is-hidden) {
     margin-left: 0;
 }
