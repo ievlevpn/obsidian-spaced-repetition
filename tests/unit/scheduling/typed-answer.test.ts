@@ -172,9 +172,11 @@ describe("compareTypedAnswer: alignment", () => {
     test("among equally good matches the earliest wins", () => {
         const r = compareTypedAnswer("print", "prints; imprints", false);
         expect(r.typed).toEqual([{ kind: "ok", text: "print" }]);
+        // "prints; imprints" lists two alternatives: marked against the first, the rest as is
         expect(r.expected).toEqual([
             { kind: "ok", text: "print" },
-            { kind: "missing", text: "s; imprints" },
+            { kind: "missing", text: "s" },
+            { kind: "other", text: "; imprints" },
         ]);
     });
 });
@@ -198,5 +200,49 @@ describe("worthMarking", () => {
 
     test("an exact answer always is", () => {
         expect(worthMarking(compareTypedAnswer("Paris", "paris", false))).toBe(true);
+    });
+});
+
+describe("compareTypedAnswer: an answer listing alternatives", () => {
+    const answer = "gloomy, sullen, тоскливый, угрюмый";
+
+    test("any one alternative is exact", () => {
+        const c = compareTypedAnswer("gloomy", answer, false);
+        expect(c.exact).toBe(true);
+        expect(c.alternative).toBe(true);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "gloomy" },
+            { kind: "other", text: ", sullen, тоскливый, угрюмый" },
+        ]);
+        expect(compareTypedAnswer("Угрюмый", answer, false).exact).toBe(true);
+    });
+
+    test("several alternatives typed, each one of them, are exact", () => {
+        const c = compareTypedAnswer("угрюмый; gloomy", answer, false);
+        expect(c.exact).toBe(true);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "gloomy" },
+            { kind: "other", text: ", sullen, тоскливый, " },
+            { kind: "ok", text: "угрюмый" },
+        ]);
+    });
+
+    test("a misspelt alternative is marked against that alternative", () => {
+        const c = compareTypedAnswer("sulen", answer, false);
+        expect(c.exact).toBe(false);
+        expect(c.alternative).toBe(true);
+        expect(worthMarking(c)).toBe(true);
+        expect(c.expected[0]).toEqual({ kind: "other", text: "gloomy, " });
+        expect(c.expected.map((p) => p.text).join("")).toEqual(answer);
+    });
+
+    test("one right and one wrong is not exact", () => {
+        expect(compareTypedAnswer("gloomy, happy", answer, false).exact).toBe(false);
+    });
+
+    test("an answer without separators is compared whole", () => {
+        const c = compareTypedAnswer("walks", "walks of length k", false);
+        expect(c.exact).toBe(false);
+        expect(c.alternative).toBeUndefined();
     });
 });

@@ -99,7 +99,8 @@ export function normalizeAnswer(text: string, ignoreAccents: boolean): string {
 }
 
 export interface DiffPart {
-    kind: "ok" | "wrong" | "missing";
+    // "other": the rest of an answer with alternatives, beside the one that was matched
+    kind: "ok" | "wrong" | "missing" | "other";
     text: string;
 }
 
@@ -107,6 +108,8 @@ export interface TypedComparison {
     exact: boolean;
     // Matched letters over the longer of the two (0..1): how close the answer came
     similarity: number;
+    // Matched against one of the answer's alternatives ("gloomy" in "gloomy, sullen")
+    alternative?: boolean;
     typed: DiffPart[];
     expected: DiffPart[];
 }
@@ -166,15 +169,106 @@ function diffParts(side: NormalizedText, matched: boolean[], missingKind: DiffPa
     return parts;
 }
 
+// What separates the alternatives of an answer ("gloomy, sullen; угрюмый / мрачный")
+const ALTERNATIVE = /[^,;/]+/g;
+
+/** The alternatives of an answer, trimmed, with where each starts in it. */
+export function answerAlternatives(text: string): { text: string; start: number }[] {
+    const result: { text: string; start: number }[] = [];
+    for (const match of text.matchAll(ALTERNATIVE)) {
+        const trimmed = match[0].trim();
+        if (trimmed === "") continue;
+        result.push({ text: trimmed, start: (match.index ?? 0) + match[0].indexOf(trimmed) });
+    }
+    return result;
+}
+
 /**
  * Compares what was typed with the expected answer letter by letter, on the text as written. `exact` is true when
  * both fold to the same text.
+ *
+ * An answer listing alternatives ("gloomy, sullen, тоскливый") also accepts any one of them, or
+ * several typed the same way, each matching one. An answer close to a single alternative is
+ * marked against that one. The expected parts then cover the whole answer: the matched
+ * alternatives marked, the rest as "other".
  */
 export function compareTypedAnswer(
     typed: string,
     expected: string,
     ignoreAccents: boolean,
 ): TypedComparison {
+    const whole = compareWhole(typed, expected, ignoreAccents);
+    const alternatives = answerAlternatives(expected);
+    if (whole.exact || alternatives.length < 2) return whole;
+
+    const typedItems = answerAlternatives(typed);
+    if (typedItems.length === 0) return whole;
+    const best = typedItems.map((item) => {
+        const comparisons = alternatives.map((alt) =>
+            compareWhole(item.text, alt.text, ignoreAccents),
+        );
+        let index = 0;
+        comparisons.forEach((c, i) => {
+            if (c.similarity > comparisons[index].similarity) index = i;
+        });
+        return { index, comparison: comparisons[index] };
+    });
+
+    // Each typed item is one of the alternatives
+    if (best.every((b) => b.comparison.exact)) {
+        const matched = new Map<number, DiffPart[]>(
+            best.map((b) => [b.index, [{ kind: "ok", text: alternatives[b.index].text }]]),
+        );
+        return {
+            exact: true,
+            similarity: 1,
+            alternative: true,
+            typed: [{ kind: "ok", text: typed.trim() }],
+            expected: withOtherParts(expected, alternatives, matched),
+        };
+    }
+
+    // One item, closer to an alternative than to the whole answer: marked against that one
+    if (typedItems.length === 1 && best[0].comparison.similarity > whole.similarity) {
+        const { index, comparison } = best[0];
+        return {
+            exact: false,
+            similarity: comparison.similarity,
+            alternative: true,
+            typed: comparison.typed,
+            expected: withOtherParts(
+                expected,
+                alternatives,
+                new Map([[index, comparison.expected]]),
+            ),
+        };
+    }
+    return whole;
+}
+
+// The whole answer as parts: the given alternatives with their own parts, everything else "other"
+function withOtherParts(
+    expected: string,
+    alternatives: { text: string; start: number }[],
+    matched: Map<number, DiffPart[]>,
+): DiffPart[] {
+    const parts: DiffPart[] = [];
+    let at = 0;
+    const other = (end: number) => {
+        if (end > at) parts.push({ kind: "other", text: expected.slice(at, end) });
+    };
+    alternatives.forEach((alt, i) => {
+        const own = matched.get(i);
+        if (own === undefined) return;
+        other(alt.start);
+        parts.push(...own);
+        at = alt.start + alt.text.length;
+    });
+    other(expected.length);
+    return parts;
+}
+
+function compareWhole(typed: string, expected: string, ignoreAccents: boolean): TypedComparison {
     const typedText = normalizeWithSource(typed, ignoreAccents);
     const expectedText = normalizeWithSource(expected, ignoreAccents);
     const { inA, inB } = commonCharacters(typedText.chars, expectedText.chars);
