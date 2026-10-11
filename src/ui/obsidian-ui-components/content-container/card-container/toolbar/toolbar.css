@@ -147,3 +147,38 @@
 .sr-card-toolbar .sr-undo-button {
     display: flex;
 }
+
+/* On a phone the row holds back, the deck info, undo, skip, the menu and (in the modal) close,
+   which is wider than the screen: the buttons keep their size and the deck info gives way, its
+   deck name shrinking to an ellipsis first. */
+.is-phone .sr-card-toolbar {
+    gap: var(--size-4-1);
+
+    & > .sr-button {
+        flex-shrink: 0;
+    }
+
+    & > .sr-flex-spacer {
+        min-width: 0;
+    }
+
+    & .sr-info-section,
+    & .sr-chosen-deck-info {
+        min-width: 0;
+        flex-shrink: 1;
+    }
+
+    & .sr-chosen-deck-info .sr-deck-name {
+        min-width: 0;
+        flex-shrink: 1;
+    }
+
+    & .sr-chosen-deck-info .sr-counter-wrapper,
+    & .sr-chosen-deck-info > .sr-divider {
+        flex-shrink: 0;
+    }
+
+    & .sr-chosen-deck-info .sr-counter-icon {
+        display: none;
+    }
+}

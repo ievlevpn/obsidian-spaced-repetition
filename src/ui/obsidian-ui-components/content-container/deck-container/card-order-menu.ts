@@ -28,6 +28,8 @@ export interface DeckReviewOptions {
 // How long a finger rests on a row before the menu opens, and how far it may drift meanwhile
 const LONG_PRESS_MS = 500;
 const LONG_PRESS_SLOP_PX = 10;
+// How long after the finger lifts a contextmenu still counts as part of the same press
+const PRESS_END_GRACE_MS = 1000;
 
 /**
  * Shows the card orders at `position`; the setting's order is ticked.
@@ -62,36 +64,57 @@ export function showCardOrderMenu(
 }
 
 /**
- * Calls `open` on right-click, and on a long press on a touch screen (where no contextmenu event
- * comes). The click that ends a long press is swallowed, so the row's own click does not fire.
+ * Calls `open` on right-click, and on a long press on a touch screen. Some touch screens (Obsidian
+ * on iPhone) also turn the long press into a contextmenu event, so whichever comes first opens the
+ * menu and the other is ignored. The click that ends a long press is swallowed, so the row's own
+ * click does not fire.
  */
 export function attachContextMenu(
     el: HTMLElement,
     open: (position: { x: number; y: number }) => void,
 ): void {
-    el.addEventListener("contextmenu", (e: MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        open({ x: e.clientX, y: e.clientY });
-    });
-
     let timer: number | null = null;
     let start: { x: number; y: number } | null = null;
     let fired = false;
+    // From touchstart until a moment after the finger lifts: a contextmenu then is the same press
+    let pressing = false;
+    let pressEndTimer: number | null = null;
+    const endPress = () => {
+        if (pressEndTimer !== null) window.clearTimeout(pressEndTimer);
+        pressEndTimer = window.setTimeout(() => {
+            pressEndTimer = null;
+            pressing = false;
+        }, PRESS_END_GRACE_MS);
+    };
     const cancel = () => {
         if (timer !== null) window.clearTimeout(timer);
         timer = null;
         start = null;
     };
+
+    el.addEventListener("contextmenu", (e: MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (pressing) {
+            if (fired) return;
+            cancel();
+            fired = true;
+        }
+        open({ x: e.clientX, y: e.clientY });
+    });
     el.addEventListener(
         "touchstart",
         (e: TouchEvent) => {
             if (e.touches.length !== 1) return cancel();
             fired = false;
+            pressing = true;
+            if (pressEndTimer !== null) window.clearTimeout(pressEndTimer);
+            pressEndTimer = null;
             start = { x: e.touches[0].clientX, y: e.touches[0].clientY };
             const at = start;
             timer = window.setTimeout(() => {
                 timer = null;
+                if (fired) return;
                 fired = true;
                 open(at);
             }, LONG_PRESS_MS);
@@ -108,8 +131,14 @@ export function attachContextMenu(
         },
         { passive: true },
     );
-    el.addEventListener("touchend", cancel);
-    el.addEventListener("touchcancel", cancel);
+    el.addEventListener("touchend", () => {
+        cancel();
+        endPress();
+    });
+    el.addEventListener("touchcancel", () => {
+        cancel();
+        endPress();
+    });
     el.addEventListener(
         "click",
         (e: MouseEvent) => {
