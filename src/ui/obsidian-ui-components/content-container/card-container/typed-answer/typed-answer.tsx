@@ -58,6 +58,7 @@ export function renderTypedResult(
     const box = parent.createDiv({ cls: "sr-typed-result" });
     if (textDirection === TextDirection.Rtl) box.setAttribute("dir", "rtl");
     box.toggleClass("is-exact", comparison.exact);
+    box.toggleClass("is-typo", comparison.typosOnly === true);
     const typedLine = box.createDiv({ cls: "sr-typed-line" });
     // A different phrasing: what was typed as it is; the answer follows on the card
     if (!worthMarking(comparison)) {

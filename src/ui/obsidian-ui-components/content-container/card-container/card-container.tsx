@@ -643,7 +643,8 @@ export class CardContainer {
                 clozeAnswer.innerText.trim(),
                 false,
             );
-            allExact &&= comparison.exact;
+            // Typos only count as right
+            allExact &&= comparison.exact || comparison.typosOnly === true;
 
             // A different phrasing, or an answer with math (whose text the letters cannot
             // follow): the answer stays as written, with what was typed beside it
@@ -661,6 +662,7 @@ export class CardContainer {
 
             clozeAnswer.empty();
             clozeAnswer.addClass("sr-typed-cloze");
+            clozeAnswer.toggleClass("is-typo", comparison.typosOnly === true);
             addDiffParts(clozeAnswer.createSpan(), comparison.typed);
             // A wrong answer, or one alternative of several: the whole answer follows
             if (!comparison.exact || comparison.alternative) {
@@ -705,7 +707,7 @@ export class CardContainer {
             this.content.appendChild(hr);
             if (typedTarget !== null && typedText.trim() !== "") {
                 const comparison = compareTypedAnswer(typedText, typedTarget, false);
-                typedExact = comparison.exact;
+                typedExact = comparison.exact || comparison.typosOnly === true;
                 renderTypedResult(
                     this.content,
                     comparison,
