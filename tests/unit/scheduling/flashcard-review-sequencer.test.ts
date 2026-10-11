@@ -2345,3 +2345,29 @@ describe("undo", () => {
         expect(c.reviewSequencer.canUndo).toBe(false);
     });
 });
+
+describe("buryCurrentCard", () => {
+    test("buries the question with its siblings until tomorrow; undo brings it back", async () => {
+        const text = `#flashcards Q1:::A1 <!--SR:!2023-09-02,4,270!2023-09-02,5,270-->
+#flashcards Q2::A2 <!--SR:!2023-09-02,5,270-->`;
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            { ...DEFAULT_SETTINGS, cardCommentOnSameLine: true },
+            text,
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        const buried = c.reviewSequencer.currentQuestion;
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+
+        await c.reviewSequencer.buryCurrentCard();
+        // Both sides of Q1 are gone from the session, and the note is untouched
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        expect(c.questionPostponementList.includes(buried)).toBe(true);
+        expect(c.file.content).toEqual(text);
+
+        expect(await c.reviewSequencer.undo()).toBe(true);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.questionPostponementList.includes(buried)).toBe(false);
+    });
+});

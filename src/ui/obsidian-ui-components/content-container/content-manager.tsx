@@ -146,6 +146,7 @@ export default class ContentManager {
             isImportant: () => this.reviewSequencer?.currentCard?.markers.important ?? false,
             toggleImportant: () => void this._toggleCurrentCardImportant(),
             suspend: () => void this._suspendCurrentCard(),
+            bury: () => void this._buryCurrentCard(),
         });
     }
 
@@ -559,6 +560,15 @@ export default class ContentManager {
         await this.reviewSequencer.flushPendingCardComment();
         await this.reviewSequencer.suspendCurrentCard();
         new Notice(t("CARD_SUSPENDED"));
+        await this._showNextCard();
+    }
+
+    private async _buryCurrentCard(): Promise<void> {
+        if (this.reviewSequencer === null) return;
+        this._stageCardComment();
+        await this.reviewSequencer.flushPendingCardComment();
+        await this.reviewSequencer.buryCurrentCard();
+        new Notice(t("CARD_BURIED"));
         await this._showNextCard();
     }
 

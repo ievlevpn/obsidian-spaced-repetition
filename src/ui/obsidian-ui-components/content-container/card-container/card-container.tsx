@@ -4,7 +4,7 @@ import { App, Platform } from "obsidian";
 
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { CardFrontBackUtil } from "src/data/data-structures/card/questions/question-type";
-import { SRSettings } from "src/data/settings";
+import { PullDownAction, SRSettings } from "src/data/settings";
 import { t } from "src/lang/helpers";
 import type SRPlugin from "src/main";
 import { RepItemScheduleInfo } from "src/scheduling/algorithms/base/rep-item-schedule-info";
@@ -20,6 +20,7 @@ import CardCommentComponent, {
     CardCommentInput,
 } from "src/ui/obsidian-ui-components/content-container/card-container/card-comment/card-comment";
 import ContextSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/context-section/context-section";
+import PullFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/pull-feedback/pull-feedback";
 import ResponseSectionComponent from "src/ui/obsidian-ui-components/content-container/card-container/response-section/response-section";
 import SwipeFeedbackComponent from "src/ui/obsidian-ui-components/content-container/card-container/swipe-feedback/swipe-feedback";
 import CardToolbarComponent from "src/ui/obsidian-ui-components/content-container/card-container/toolbar/toolbar";
@@ -36,6 +37,7 @@ import {
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
 import EmulatedPlatform from "src/utils/platform-detector";
+import { attachPullDown } from "src/utils/pull-down";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
 import { removeCommonIndent } from "src/utils/strings";
 
@@ -185,6 +187,26 @@ export class CardContainer {
                         backFeedback.release(committed, () => void this.undoHandler()),
                 }),
             );
+
+            // Pull the card down from its top: the action chosen in the settings
+            const pullFeedback = new PullFeedbackComponent(this.scrollWrapper);
+            this.detachSwipes.push(
+                attachPullDown(this.scrollWrapper, {
+                    isActive: (target) =>
+                        settings.mobilePullDownAction !== "off" &&
+                        (this.cardState === CardState.Front || this.cardState === CardState.Back) &&
+                        this.content.scrollTop <= 0 &&
+                        !isEditable(target),
+                    onMove: (offset, armed) => {
+                        const { icon, label } = pullDownActionLook(settings.mobilePullDownAction);
+                        pullFeedback.move(offset, armed, icon, label);
+                    },
+                    onRelease: (committed) =>
+                        pullFeedback.release(committed, () =>
+                            this.runPullDownAction(settings.mobilePullDownAction),
+                        ),
+                }),
+            );
         }
 
         // Attached to the view, not the scroll wrapper. The wrapper is a `display: flex` with no
@@ -209,6 +231,12 @@ export class CardContainer {
         this.cardComment.destroy();
         this.detachSwipes.forEach((detach) => detach());
         this.detachSwipes = [];
+    }
+
+    private runPullDownAction(action: PullDownAction): void {
+        if (action === "menu") this.toolbar.openCardMenu();
+        else if (action === "important") this.markerActions?.toggleImportant();
+        else if (action === "bury") this.markerActions?.bury();
     }
 
     // An edge swipe applies while a card is shown and the touch is level with the review view
@@ -764,4 +792,19 @@ export class CardContainer {
             }
         }
     };
+}
+
+// The pull-down indicator's icon and name for each action
+function pullDownActionLook(action: PullDownAction): { icon: string; label: string } {
+    if (action === "important") return { icon: "star", label: t("IMPORTANT_CARD") };
+    if (action === "bury") return { icon: "calendar-clock", label: t("BURY_CARD") };
+    return { icon: "ellipsis-vertical", label: t("OPEN_MENU") };
+}
+
+// A touch in a text field (the typed answer) is for the field, not a pull
+function isEditable(target: EventTarget | null): boolean {
+    return (
+        target instanceof HTMLElement &&
+        target.closest("input, textarea, [contenteditable='true']") !== null
+    );
 }

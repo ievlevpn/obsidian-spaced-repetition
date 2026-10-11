@@ -1,6 +1,7 @@
 import { Setting, SettingGroup } from "obsidian";
 
 import { DataManager } from "src/data/data-manager";
+import { PullDownAction } from "src/data/settings";
 import { SettingsManager } from "src/data/settings-manager";
 import { t } from "src/lang/helpers";
 import SRPlugin from "src/main";
@@ -61,6 +62,24 @@ export class MobilePage extends SettingsPage {
                             .setValue(this.settingsManager.settings.mobileSwipeToUndo)
                             .onChange(async (value) => {
                                 this.settingsManager.settings.mobileSwipeToUndo = value;
+                                await this.settingsManager.save();
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName(t("PULL_DOWN_ACTION"))
+                    .setDesc(t("PULL_DOWN_ACTION_DESC"))
+                    .addDropdown((dropdown) =>
+                        dropdown
+                            .addOption("menu", t("PULL_DOWN_MENU"))
+                            .addOption("important", t("IMPORTANT_CARD"))
+                            .addOption("bury", t("BURY_CARD"))
+                            .addOption("off", t("PULL_DOWN_OFF"))
+                            .setValue(this.settingsManager.settings.mobilePullDownAction)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.mobilePullDownAction =
+                                    value as PullDownAction;
                                 await this.settingsManager.save();
                             }),
                     );

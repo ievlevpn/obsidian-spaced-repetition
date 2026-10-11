@@ -176,6 +176,19 @@ export default class CardToolbarComponent {
         );
     }
 
+    /** Opens the card menu, as its button does (the pull-down gesture). */
+    public openCardMenu(): void {
+        // Whichever of the two menu buttons this width shows
+        const button: HTMLElement =
+            [this.extendedMenuButton, this.shortMenuButton]
+                .map((b) => b.buttonEl)
+                .find((el) => el.offsetParent !== null) ?? this.extendedMenuButton.buttonEl;
+        const rect: DOMRect = button.getBoundingClientRect();
+        button.dispatchEvent(
+            new MouseEvent("click", { bubbles: true, clientX: rect.left, clientY: rect.bottom }),
+        );
+    }
+
     /** Gives both card menus the "Important" and "Suspend card" items. */
     public setMarkerActions(actions: CardMarkerActions): void {
         this.extendedMenuButton.markerActions = actions;

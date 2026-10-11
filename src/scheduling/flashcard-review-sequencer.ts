@@ -43,6 +43,7 @@ export interface IFlashcardReviewSequencer {
     skipCurrentCard(): void;
     toggleCurrentCardImportant(): Promise<boolean>;
     suspendCurrentCard(): Promise<void>;
+    buryCurrentCard(): Promise<void>;
     get canUndo(): boolean;
     undo(): Promise<boolean>;
     determineCardSchedule(response: ReviewResponse, card: Card): RepItemScheduleInfo;
@@ -354,6 +355,19 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this.undoStack = [];
         this._originalDeckTree.deleteCardFromAllDecks(card, false);
         this.cardSequencer.deleteCurrentRepItemFromAllDecks();
+    }
+
+    /**
+     * Buries the current card, with its siblings, until tomorrow: its question goes on the
+     * day's postponement list (the one "Bury sibling cards" uses) and out of this session. Undo
+     * brings it back, like a skip.
+     */
+    async buryCurrentCard(): Promise<void> {
+        if (this.currentCard === null) return;
+        this.pushUndo();
+        this.questionPostponementList.add(this.currentQuestion);
+        await this.questionPostponementList.write();
+        this.cardSequencer.deleteCurrentQuestionFromAllDecks();
     }
 
     get canUndo(): boolean {

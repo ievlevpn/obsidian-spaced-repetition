@@ -21,6 +21,8 @@ export interface IBaseLocale {
     CARD_STATUS_SEEN_HINT: string;
     IMPORTANT_CARD: string;
     SUSPEND_CARD: string;
+    BURY_CARD: string;
+    CARD_BURIED: string;
     CARD_MARKED_IMPORTANT: string;
     CARD_UNMARKED_IMPORTANT: string;
     CARD_SUSPENDED: string;
@@ -243,6 +245,10 @@ export interface IBaseLocale {
     SWIPE_RELEASE_TO_GO_BACK: string;
     SWIPE_TO_UNDO: string;
     SWIPE_TO_UNDO_DESC: string;
+    PULL_DOWN_ACTION: string;
+    PULL_DOWN_ACTION_DESC: string;
+    PULL_DOWN_OFF: string;
+    PULL_DOWN_MENU: string;
     STATUS_BAR_SETTINGS: string;
     SHOW_STATUS_BAR: string;
     SHOW_STATUS_BAR_DESC: string;
