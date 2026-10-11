@@ -4,6 +4,9 @@ import { SRAlgorithmType } from "src/scheduling/algorithms/base/isr-algorithm";
 import { AnswerKeys } from "src/scheduling/answer-keys";
 import { pathMatchesPattern } from "src/utils/fs";
 
+// What pulling a card down does on mobile
+export type PullDownAction = "off" | "menu" | "important" | "bury";
+
 export interface SRSettings {
     // flashcards
     flashcardTags: string[];
@@ -70,6 +73,8 @@ export interface SRSettings {
     mobileSwipeToSkip: boolean;
     // Mobile: swipe right from the left edge to go back to the previous card (undo)
     mobileSwipeToUndo: boolean;
+    // Mobile: what pulling a card down (from its top) does
+    mobilePullDownAction: PullDownAction;
     showDeleteButtonInCardView: boolean;
     showDeleteButtonInFileMenu: boolean;
     openViewInNewTab: boolean;
@@ -174,6 +179,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     openViewInNewTabMobile: false,
     mobileSwipeToSkip: true,
     mobileSwipeToUndo: true,
+    mobilePullDownAction: "menu",
     useCustomHotkeys: false,
     answerKeys: "original",
     showProgressBar: true,

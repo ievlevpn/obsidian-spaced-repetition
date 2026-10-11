@@ -14,6 +14,7 @@ export interface CardMarkerActions {
     isImportant(): boolean;
     toggleImportant(): void;
     suspend(): void;
+    bury(): void;
 }
 
 export default class CardMenuButtonComponent extends MenuButtonComponent {
@@ -138,6 +139,11 @@ export default class CardMenuButtonComponent extends MenuButtonComponent {
                     .setIcon("star")
                     .setChecked(actions.isImportant())
                     .onClick(() => actions.toggleImportant());
+            });
+            cardMenu.addItem((item) => {
+                item.setTitle(t("BURY_CARD"))
+                    .setIcon("calendar-clock")
+                    .onClick(() => actions.bury());
             });
             cardMenu.addItem((item) => {
                 item.setTitle(t("SUSPEND_CARD"))

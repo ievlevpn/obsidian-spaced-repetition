@@ -40,6 +40,10 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 - Mobile: swipe left from the right edge to skip and right from the left edge to go back, with
   visual feedback (toggles in a new _Mobile_ settings page); Skip stays visible in the phone
   toolbar.
+- Mobile: pull a card down from its top to open the card menu, mark it important, or bury it until
+  tomorrow (chosen on the _Mobile_ settings page). A card scrolled down scrolls back up first, so
+  it never competes with scrolling. "Bury until tomorrow" is also in the card menu, and Undo
+  brings a buried card back.
 - A "due first, then random" card order, and a menu on each deck (right-click, or long-press on a
   phone) to review it in another card order for one session.
 - Type the answer: switched on per session from the card menu. A card with a short plain-text

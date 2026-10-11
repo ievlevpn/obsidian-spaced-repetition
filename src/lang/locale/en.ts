@@ -25,6 +25,8 @@ const en: IBaseLocale = {
     CARD_STATUS_SEEN_HINT: "You have answered this card before",
     IMPORTANT_CARD: "Important",
     SUSPEND_CARD: "Suspend card",
+    BURY_CARD: "Bury until tomorrow",
+    CARD_BURIED: "Buried until tomorrow.",
     CARD_MARKED_IMPORTANT: "Marked as important.",
     CARD_UNMARKED_IMPORTANT: "No longer marked as important.",
     CARD_SUSPENDED: "Card suspended. Find it under Suspended cards to bring it back.",
@@ -290,6 +292,11 @@ const en: IBaseLocale = {
     SWIPE_TO_UNDO: "Swipe from the left edge to go back",
     SWIPE_TO_UNDO_DESC:
         "While reviewing, swipe right from the left edge of the screen to go back to the previous card, undoing your last answer or skip (like the Undo button).",
+    PULL_DOWN_ACTION: "Pull a card down to",
+    PULL_DOWN_ACTION_DESC:
+        "While reviewing, pull the card down from its top to open the card menu, mark the card important, or bury it (and its siblings) until tomorrow. A card scrolled down scrolls back up first; the pull only starts once it is at its top.",
+    PULL_DOWN_OFF: "Do nothing",
+    PULL_DOWN_MENU: "Open the card menu",
     STATUS_BAR_SETTINGS: "Status Bar",
     SHOW_STATUS_BAR: "Show status bar",
     SHOW_STATUS_BAR_DESC: "Turn this off to hide all status messages in Obsidian's status bar",

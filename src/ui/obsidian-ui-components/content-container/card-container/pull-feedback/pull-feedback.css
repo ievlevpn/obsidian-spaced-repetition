@@ -1,0 +1,58 @@
+/*
+ * Pull-down feedback. The host (the card's scroll wrapper) holds the content and the indicator,
+ * and carries the content's offset as --sr-pull-dy. Phases: .sr-pull-dragging (follows the
+ * finger), .sr-pull-back (springs back, 200ms; matches pull-feedback.tsx).
+ */
+.sr-pull-host {
+    --sr-pull-dy: 0px;
+    position: relative;
+
+    &.sr-pull-dragging > .sr-content,
+    &.sr-pull-back > .sr-content {
+        transform: translateY(var(--sr-pull-dy));
+    }
+
+    &.sr-pull-back > .sr-content {
+        transition: transform 200ms ease-out;
+    }
+}
+
+.sr-pull-indicator {
+    position: absolute;
+    top: var(--size-4-2);
+    left: 50%;
+    transform: translate(-50%, calc(var(--sr-pull-dy) - 100%));
+    opacity: 0;
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    gap: var(--size-4-2);
+    padding: var(--size-4-1) var(--size-4-3);
+    border-radius: var(--radius-l);
+    background-color: var(--background-secondary);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-s);
+    font-size: var(--font-ui-smaller);
+    white-space: nowrap;
+    transition:
+        background-color 120ms ease-out,
+        color 120ms ease-out;
+
+    & .sr-pull-indicator-icon {
+        display: flex;
+    }
+
+    &.is-armed {
+        background-color: var(--interactive-accent);
+        color: var(--text-on-accent);
+    }
+}
+
+.sr-pull-dragging > .sr-pull-indicator {
+    opacity: 1;
+}
+
+.sr-pull-back > .sr-pull-indicator {
+    opacity: 0;
+    transition: opacity 150ms ease-out;
+}
