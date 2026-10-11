@@ -4,6 +4,15 @@
 
 export const MAX_TYPED_ANSWER_LENGTH = 120;
 
+// Below this similarity, marking letters says nothing useful (a different phrasing, not a
+// misspelling): what was typed is shown as it is, next to the answer
+export const CLOSE_ENOUGH = 0.6;
+
+/** Whether a comparison is worth marking letter by letter. */
+export function worthMarking(comparison: TypedComparison): boolean {
+    return comparison.exact || comparison.similarity >= CLOSE_ENOUGH;
+}
+
 // A list item, a quote or callout, a table row, or an HTML tag or comment: not plain text
 const LIST_START = /^([-*+]|\d+[.)])\s/;
 const HTML_TAG = /<\/?[a-z][^>]*>|<!--/i;
@@ -96,6 +105,8 @@ export interface DiffPart {
 
 export interface TypedComparison {
     exact: boolean;
+    // Matched letters over the longer of the two (0..1): how close the answer came
+    similarity: number;
     typed: DiffPart[];
     expected: DiffPart[];
 }
@@ -167,8 +178,10 @@ export function compareTypedAnswer(
     const typedText = normalizeWithSource(typed, ignoreAccents);
     const expectedText = normalizeWithSource(expected, ignoreAccents);
     const { inA, inB } = commonCharacters(typedText.chars, expectedText.chars);
+    const longer: number = Math.max(typedText.chars.length, expectedText.chars.length);
     return {
         exact: typedText.chars.join("") === expectedText.chars.join(""),
+        similarity: longer === 0 ? 1 : inA.filter(Boolean).length / longer,
         typed: typedText.chars.length === 0 ? [] : diffParts(typedText, inA, "wrong"),
         expected: diffParts(expectedText, inB, "missing"),
     };

@@ -1,7 +1,9 @@
 import {
+    CLOSE_ENOUGH,
     compareTypedAnswer,
     normalizeAnswer,
     typedAnswerTarget,
+    worthMarking,
 } from "src/scheduling/typed-answer";
 
 describe("typedAnswerTarget", () => {
@@ -141,7 +143,12 @@ describe("compareTypedAnswer: more", () => {
         expect(r.expected).toEqual([{ kind: "missing", text: "board" }]);
     });
     test("two empty strings are exact and show nothing", () => {
-        expect(compareTypedAnswer("", "", false)).toEqual({ exact: true, typed: [], expected: [] });
+        expect(compareTypedAnswer("", "", false)).toEqual({
+            exact: true,
+            similarity: 1,
+            typed: [],
+            expected: [],
+        });
     });
     test("a whole different word is all wrong and all missing", () => {
         const r = compareTypedAnswer("xyz", "abc", false);
@@ -169,5 +176,27 @@ describe("compareTypedAnswer: alignment", () => {
             { kind: "ok", text: "print" },
             { kind: "missing", text: "s; imprints" },
         ]);
+    });
+});
+
+describe("worthMarking", () => {
+    test("a misspelling is marked letter by letter", () => {
+        const c = compareTypedAnswer("adjacency matix", "adjacency matrix", false);
+        expect(c.similarity).toBeGreaterThan(0.9);
+        expect(worthMarking(c)).toBe(true);
+    });
+
+    test("a different phrasing is not", () => {
+        const c = compareTypedAnswer(
+            "number of k step walks",
+            "walks of length k from u to v",
+            false,
+        );
+        expect(c.similarity).toBeLessThan(CLOSE_ENOUGH);
+        expect(worthMarking(c)).toBe(false);
+    });
+
+    test("an exact answer always is", () => {
+        expect(worthMarking(compareTypedAnswer("Paris", "paris", false))).toBe(true);
     });
 });

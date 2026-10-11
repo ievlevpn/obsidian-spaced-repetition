@@ -80,6 +80,31 @@
     }
 }
 
+/* An answer too far off to mark letter by letter, shown as typed: beside the cloze answer, or
+   as the line above the card's answer */
+.sr-typed-yours {
+    margin-inline-start: var(--size-4-1);
+    padding: 0 var(--size-4-1);
+    border-radius: var(--radius-s);
+    font-size: 0.85em;
+    color: var(--text-muted);
+    background-color: rgba(var(--color-red-rgb), 0.1);
+
+    &::before {
+        content: "\270E\00a0";
+        color: var(--text-faint);
+    }
+}
+
+.sr-typed-line.sr-typed-far {
+    color: var(--text-muted);
+
+    &::before {
+        content: "\270E\00a0";
+        color: var(--text-faint);
+    }
+}
+
 /* The rating the typed answer suggests; the choice stays with you */
 .sr-response .sr-response-button.sr-is-suggested {
     outline: 2px solid var(--interactive-accent);
