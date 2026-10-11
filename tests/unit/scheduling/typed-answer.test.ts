@@ -146,6 +146,7 @@ describe("compareTypedAnswer: more", () => {
         expect(compareTypedAnswer("", "", false)).toEqual({
             exact: true,
             similarity: 1,
+            typedWordsInAnswer: false,
             typed: [],
             expected: [],
         });
@@ -245,4 +246,27 @@ describe("compareTypedAnswer: an answer listing alternatives", () => {
         expect(c.exact).toBe(false);
         expect(c.alternative).toBeUndefined();
     });
+});
+
+describe("worthMarking: a part of the answer typed word for word", () => {
+    test("one word of a longer answer is marked", () => {
+        const c = compareTypedAnswer("крона", "крона дерева", false);
+        expect(c.similarity).toBeLessThan(CLOSE_ENOUGH);
+        expect(worthMarking(c)).toBe(true);
+        expect(c.typed).toEqual([{ kind: "ok", text: "крона" }]);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "крона" },
+            { kind: "missing", text: " дерева" },
+        ]);
+    });
+
+    test("a word that is not in the answer is not", () => {
+        expect(worthMarking(compareTypedAnswer("крон", "крона дерева", false))).toBe(true);
+        expect(worthMarking(compareTypedAnswer("ствол", "крона дерева", false))).toBe(false);
+    });
+});
+
+test("the earlier rephrased answer is still shown as typed", () => {
+    const c = compareTypedAnswer("number of k step walks", "walks of length k from u to v", false);
+    expect(worthMarking(c)).toBe(false);
 });
