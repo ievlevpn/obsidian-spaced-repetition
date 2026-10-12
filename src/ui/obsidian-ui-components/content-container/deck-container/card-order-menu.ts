@@ -41,11 +41,13 @@ const PRESS_END_GRACE_MS = 1000;
  * @param position - Where to open the menu
  * @param defaultOrder - The card order of the settings
  * @param onPick - Called with the RepItemOrder name that was chosen
+ * @param typing - The deck's "type answers" default, shown as a checkbox
  */
 export function showCardOrderMenu(
     position: { x: number; y: number },
     defaultOrder: string,
     onPick: (options: DeckReviewOptions) => void,
+    typing?: { on: boolean; set: (on: boolean) => void },
 ): void {
     const menu = new Menu();
     menu.addItem((item) =>
@@ -54,6 +56,15 @@ export function showCardOrderMenu(
             .setIcon("star")
             .onClick(() => onPick({ importantOnly: true })),
     );
+    if (typing) {
+        menu.addItem((item) =>
+            item
+                .setTitle(t("TYPE_ANSWERS_DECK_DEFAULT"))
+                .setIcon("keyboard")
+                .setChecked(typing.on)
+                .onClick(() => typing.set(!typing.on)),
+        );
+    }
     menu.addSeparator();
     menu.addItem((item) => item.setTitle(t("REVIEW_IN_ORDER")).setIsLabel(true));
     for (const [order, label] of CARD_ORDERS) {

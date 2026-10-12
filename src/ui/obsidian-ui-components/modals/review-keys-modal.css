@@ -1,0 +1,22 @@
+/* The review's keyboard shortcuts ("?") */
+.sr-keys-section {
+    font-weight: var(--font-semibold);
+    margin: var(--size-4-4) 0 var(--size-4-2);
+
+    &:first-child {
+        margin-top: 0;
+    }
+}
+
+.sr-keys-table {
+    display: grid;
+    grid-template-columns: max-content 1fr;
+    gap: var(--size-4-1) var(--size-4-4);
+    align-items: baseline;
+    font-size: var(--font-ui-small);
+
+    & kbd {
+        justify-self: start;
+        white-space: nowrap;
+    }
+}

@@ -20,6 +20,8 @@ export interface SRSettings {
     flashcardCardOrder: string;
     // Card order "Due/new mixed": the chance (0..1) that the next card is a new one
     flashcardNewProbability: number;
+    // Decks whose reviews start with typing answers on, by deck path (see utils/deck-typing)
+    typeAnswersDecks: Record<string, boolean>;
     flashcardDeckOrder: string;
     convertClozePatternsToInputs: boolean;
     convertHighlightsToClozes: boolean;
@@ -129,6 +131,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     burySiblingCards: false,
     flashcardCardOrder: "DueFirstRandom",
     flashcardNewProbability: 0.5,
+    typeAnswersDecks: {},
     flashcardDeckOrder: "PrevDeckComplete_Sequential",
     convertClozePatternsToInputs: false,
     convertHighlightsToClozes: true,

@@ -27,6 +27,7 @@ import { MixedOrderModal } from "src/ui/obsidian-ui-components/modals/mixed-orde
 import { SuspendedCardsModal } from "src/ui/obsidian-ui-components/modals/suspended-cards-modal";
 import { ReviewQueueLoader } from "src/ui/review-queue-loader";
 import { UIManager, UIState } from "src/ui/ui-manager";
+import { setTypeAnswersForDeck, typeAnswersForDeck } from "src/utils/deck-typing";
 import EmulatedPlatform from "src/utils/platform-detector";
 
 export enum ContentState {
@@ -123,6 +124,11 @@ export default class ContentManager {
             this._changeReviewMode.bind(this),
             this._startReviewOfDeck.bind(this),
             () => new SuspendedCardsModal(this.app, this.plugin).open(),
+            {
+                isOn: (deck: Deck) =>
+                    typeAnswersForDeck(this.settings.typeAnswersDecks, deck.getTopicPath().path),
+                set: (deck: Deck, on: boolean) => this._setDeckTyping(deck, on),
+            },
             closeModal,
         );
 
@@ -529,7 +535,7 @@ export default class ContentManager {
             FlashcardReviewMode.Cram,
         );
 
-        this.cardContainer.resetTypeAnswers();
+        this.cardContainer.resetTypeAnswers(this._deckTypes(deck));
         this.importantSessionMode ??= this.reviewMode;
         this.reviewMode = FlashcardReviewMode.Cram;
         this.reviewSequencer = reviewSequencer;
@@ -653,7 +659,7 @@ export default class ContentManager {
             this.dataManager.settingsManager.settings.flashcardNewProbability = chosen;
             await this.dataManager.settingsManager.save();
         }
-        this.cardContainer.resetTypeAnswers();
+        this.cardContainer.resetTypeAnswers(this._deckTypes(deck));
         this.sessionCardOrder = options.cardOrder ?? this.settings.flashcardCardOrder;
         this.reviewSequencer.setCardOrder(
             iteratorOrderFromNames(
@@ -681,6 +687,23 @@ export default class ContentManager {
     }
 
     // MARK: Utils
+
+    // Whether reviews of the deck start with typing answers on
+    private _deckTypes(deck: Deck): boolean {
+        return typeAnswersForDeck(this.settings.typeAnswersDecks, deck.getTopicPath().path);
+    }
+
+    // The deck menu's "Type answers in this deck": saved with the settings
+    private async _setDeckTyping(deck: Deck, on: boolean): Promise<void> {
+        const map = setTypeAnswersForDeck(
+            this.dataManager.settingsManager.settings.typeAnswersDecks ?? {},
+            deck.getTopicPath().path,
+            on,
+        );
+        this.settings.typeAnswersDecks = map;
+        this.dataManager.settingsManager.settings.typeAnswersDecks = map;
+        await this.dataManager.settingsManager.save();
+    }
 
     /** Stages any typed comment. Call before leaving a card by any route. */
     private _stageCardComment(): void {

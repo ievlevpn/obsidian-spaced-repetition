@@ -9,7 +9,9 @@ import {
     IFlashcardReviewSequencer as IFlashcardReviewSequencer,
 } from "src/scheduling/flashcard-review-sequencer";
 import { DeckReviewOptions } from "src/ui/obsidian-ui-components/content-container/deck-container/card-order-menu";
-import DeckListComponent from "src/ui/obsidian-ui-components/content-container/deck-container/deck-list";
+import DeckListComponent, {
+    DeckTypingAccess,
+} from "src/ui/obsidian-ui-components/content-container/deck-container/deck-list";
 import DeckListHeaderComponent from "src/ui/obsidian-ui-components/content-container/deck-container/deck-list-header";
 
 export class DeckContainer {
@@ -22,6 +24,7 @@ export class DeckContainer {
         changeReviewMode: (reviewMode: FlashcardReviewMode) => void,
         startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void,
         showSuspendedCards: () => void,
+        deckTyping: DeckTypingAccess,
         closeModal?: () => void,
     ) {
         // Build ui
@@ -35,7 +38,7 @@ export class DeckContainer {
             closeModal,
         );
 
-        this.deckList = new DeckListComponent(this.containerEl, startReviewOfDeck);
+        this.deckList = new DeckListComponent(this.containerEl, startReviewOfDeck, deckTyping);
     }
 
     /**
@@ -54,6 +57,7 @@ export class DeckContainer {
         if (this.containerEl.hasClass("sr-is-hidden")) {
             this.containerEl.removeClass("sr-is-hidden");
         }
+        this.deckList.focusSelectedRow();
     }
 
     /**

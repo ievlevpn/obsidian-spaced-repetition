@@ -1,6 +1,6 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-container.css";
 import moment from "moment";
-import { App, Platform } from "obsidian";
+import { App, Notice, Platform } from "obsidian";
 
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { CardFrontBackUtil } from "src/data/data-structures/card/questions/question-type";
@@ -37,6 +37,7 @@ import {
     SessionData,
 } from "src/ui/obsidian-ui-components/content-container/content-manager";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
+import { ReviewKeysModal } from "src/ui/obsidian-ui-components/modals/review-keys-modal";
 import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { attachPullDown } from "src/utils/pull-down";
@@ -89,6 +90,9 @@ export class CardContainer {
     private showAnswerHandler: () => void;
     private jumpToCardHandler: () => Promise<void>;
     private undoHandler: () => Promise<void>;
+    private backToDeckHandler: () => Promise<void>;
+    private editCardHandler: () => void;
+    private cardInfoHandler: () => void;
 
     constructor(
         app: App,
@@ -116,6 +120,9 @@ export class CardContainer {
         this.showAnswerHandler = showAnswerHandler;
         this.jumpToCardHandler = jumpToCurrentCardHandler;
         this.undoHandler = undoHandler;
+        this.backToDeckHandler = backToDeckHandler;
+        this.editCardHandler = editCardHandler;
+        this.cardInfoHandler = displayCurrentCardInfoNoticeHandler;
 
         // Build ui
         this.view = parentEl.createDiv();
@@ -132,17 +139,7 @@ export class CardContainer {
             jumpToCurrentCardHandler,
             displayCurrentCardInfoNoticeHandler,
             this.skipCardHandler,
-            () => {
-                new ConfirmationModal(
-                    app,
-                    t("DELETE_SCHEDULING_DATA_OF_CURRENT_CARD"),
-                    t("CONFIRM_SCHEDULING_DATA_DELETION_OF_CURRENT_CARD"),
-                    t("SCHEDULING_DATA_DELETION_IN_PROGRESS_OF_CURRENT_CARD"),
-                    async () => {
-                        await this.processReviewHandler(ReviewResponse.Reset);
-                    },
-                ).open();
-            },
+            () => this.confirmReset(),
             () => void this.undoHandler(),
             closeModal,
         );
@@ -309,6 +306,21 @@ export class CardContainer {
         }
     }
 
+    // Resets the card's schedule, after asking (the Reset button and the R key)
+    private confirmReset(): void {
+        new ConfirmationModal(
+            this.app,
+            t("DELETE_SCHEDULING_DATA_OF_CURRENT_CARD"),
+            t("CONFIRM_SCHEDULING_DATA_DELETION_OF_CURRENT_CARD"),
+            t("SCHEDULING_DATA_DELETION_IN_PROGRESS_OF_CURRENT_CARD"),
+            async () => {
+                await this.processReviewHandler(ReviewResponse.Reset);
+            },
+        )
+            .confirmWithEnter()
+            .open();
+    }
+
     /** Switches typing the answer on or off; a card showing its question is redrawn. */
     public async setTypeAnswers(on: boolean): Promise<void> {
         this.typeAnswers = on;
@@ -331,9 +343,12 @@ export class CardContainer {
         if (fresh) old.replaceWith(fresh);
     }
 
-    /** Typing the answer lasts one session: a new review session starts with it off. */
-    public resetTypeAnswers(): void {
-        this.typeAnswers = false;
+    /**
+     * Typing the answer lasts one session: a new review session starts with it as the deck's
+     * default (off unless the deck, or a deck above it, is set to type answers).
+     */
+    public resetTypeAnswers(on: boolean = false): void {
+        this.typeAnswers = on;
     }
 
     /**
@@ -848,7 +863,58 @@ export class CardContainer {
             e.stopPropagation();
         };
 
+        // "?" (Shift+/ on most layouts) lists the keys
+        if (e.key === "?") {
+            new ReviewKeysModal(this.app).open();
+            consumeKeyEvent();
+            return;
+        }
+        // Keys with a modifier belong to Obsidian (Cmd+E, Ctrl+S, ...)
+        if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+        const onCard: boolean =
+            this.cardState === CardState.Front || this.cardState === CardState.Back;
+
         switch (e.code) {
+            case "KeyE":
+                if (!onCard) break;
+                this.editCardHandler();
+                consumeKeyEvent();
+                break;
+            case "KeyT":
+                if (!onCard) break;
+                void this.setTypeAnswers(!this.typeAnswers);
+                new Notice(this.typeAnswers ? t("TYPE_ANSWERS_ON") : t("TYPE_ANSWERS_OFF"));
+                consumeKeyEvent();
+                break;
+            case "KeyN":
+                if (this.cardState !== CardState.Back) break;
+                this.cardComment.openAndFocus();
+                consumeKeyEvent();
+                break;
+            case "KeyM":
+                if (!onCard) break;
+                this.toolbar.openCardMenu();
+                consumeKeyEvent();
+                break;
+            case "KeyB":
+                if (!onCard || this.markerActions === null) break;
+                this.markerActions.bury();
+                consumeKeyEvent();
+                break;
+            case "KeyR":
+                if (this.cardState !== CardState.Back) break;
+                this.confirmReset();
+                consumeKeyEvent();
+                break;
+            case "KeyC":
+                if (!onCard) break;
+                this.cardInfoHandler();
+                consumeKeyEvent();
+                break;
+            case "Backspace":
+                void this.backToDeckHandler();
+                consumeKeyEvent();
+                break;
             case "KeyS":
                 this.skipCardHandler();
                 consumeKeyEvent();
