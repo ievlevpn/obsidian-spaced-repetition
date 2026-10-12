@@ -68,3 +68,26 @@
     opacity: 0;
     cursor: default;
 }
+
+/* The keys of Save and Cancel, styled like the rating buttons' */
+body:not(.is-mobile) .sr-edit-view .sr-response-button[data-key] {
+    position: relative;
+
+    &::after {
+        content: attr(data-key);
+        position: absolute;
+        right: 4px;
+        bottom: 4px;
+        height: 0.8rem;
+        border-radius: var(--input-radius);
+        line-height: 1;
+        padding: 2px 4px;
+        padding-top: 3px;
+        font-size: x-small;
+        box-shadow:
+            inset 1px 1px rgb(255 255 255 / 20%),
+            inset -1px -1px rgb(0 0 0 / 20%);
+        color: #f7f7f7;
+        font-family: var(--font-monospace);
+    }
+}

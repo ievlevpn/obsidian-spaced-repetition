@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/modals/edit-modal.css";
-import { App, ButtonComponent, Component, Modal, Scope } from "obsidian";
+import { App, ButtonComponent, Component, Modal, Platform, Scope } from "obsidian";
 
 import { Card } from "src/data/data-structures/card/card";
 import { CardType } from "src/data/data-structures/card/questions/question";
@@ -140,6 +140,8 @@ export class FlashcardEditModal extends Modal {
         });
 
         this.saveButton = saveButton;
+        // Their keys, in the corner like the rating buttons' (not on a phone)
+        saveButton.buttonEl.setAttribute("data-key", Platform.isMacOS ? "⌘↵" : "Ctrl+↵");
 
         const button = response.createEl("button");
         button.addClasses(["sr-response-button", "sr-dummy-button"]);
@@ -153,6 +155,7 @@ export class FlashcardEditModal extends Modal {
         cancelButton.onClick((evt) => {
             this.cancelClickCallback(evt);
         });
+        cancelButton.buttonEl.setAttribute("data-key", "Esc");
 
         this.open();
     }
