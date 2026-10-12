@@ -2,7 +2,7 @@ import { ClozeCrafter } from "clozecraft";
 
 import { SR_METADATA_CALLOUT } from "src/data/constants";
 import { CardType } from "src/data/data-structures/card/questions/question";
-import { isFootnoteContinuationLine, isFootnoteDefinitionLine } from "src/utils/card-comment";
+import { footnoteDefinitionEnd, isFootnoteDefinitionLine } from "src/utils/card-comment";
 import { findMathSpans, MathSpan, splitMath } from "src/utils/math-spans";
 
 export let debugParser = false;
@@ -226,7 +226,7 @@ export function parse(text: string, options: ParserOptions): ParsedQuestionInfo[
             if (cardType) pushCard(cardType, cardText, firstLineNo, i - 1);
             cardType = null;
             cardText = "";
-            while (i + 1 < lines.length && isFootnoteContinuationLine(lines[i + 1])) i++;
+            i = footnoteDefinitionEnd(lines, i) - 1;
             firstLineNo = i + 1;
             continue;
         }

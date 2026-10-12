@@ -123,6 +123,19 @@ describe("formatCardCommentDefinition", () => {
 });
 
 describe("parseCardCommentDefinition", () => {
+    test("an entry of two paragraphs round-trips", () => {
+        const entries = [
+            { date: "2026-10-11", text: "First paragraph.\n\nSecond paragraph." },
+            { date: "2026-10-12", text: "Next" },
+        ];
+        const def: string = formatCardCommentDefinition("sr-a3f91c", entries);
+        expect(def).toEqual(
+            "[^sr-a3f91c]: - *2026-10-11:* First paragraph.\n      \n      Second paragraph.\n" +
+                "    - *2026-10-12:* Next",
+        );
+        expect(parseCardCommentDefinition(def)).toEqual(entries);
+    });
+
     test("is the inverse of format for a multi-entry, multi-line comment", () => {
         const entries: CardCommentEntry[] = [
             { date: "2026-10-03", text: "first\nwrapped" },
