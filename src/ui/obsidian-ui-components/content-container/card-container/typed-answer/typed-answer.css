@@ -1,19 +1,5 @@
 /* MARK: Typing the answer */
 
-.sr-typed {
-    display: flex;
-    justify-content: center;
-    width: 100%;
-    margin: var(--size-4-4) 0;
-}
-
-.sr-typed .sr-typed-input {
-    width: 100%;
-    max-width: 460px;
-    height: var(--input-height);
-    font-size: var(--font-ui-medium);
-}
-
 .sr-typed-result {
     display: flex;
     flex-direction: column;
@@ -118,12 +104,13 @@
     outline-offset: 2px;
 }
 
-/* MARK: Free answer: typed, then shown beside the answer for judging oneself */
+/* MARK: The answer field: one quiet look for the single-line field, the free box and the cloze
+   blanks. A soft fill and a faint underline that takes the accent colour on focus; no frame. */
 
 .sr-typed-free {
     display: flex;
     flex-direction: column;
-    gap: var(--size-4-2);
+    gap: var(--size-2-2);
     width: 100%;
     margin: var(--size-4-4) 0;
 }
@@ -132,22 +119,42 @@
 .sr-typed-free-textarea {
     position: relative;
     width: 100%;
-    border: var(--input-border-width) solid var(--background-modifier-border);
-    background-color: var(--background-modifier-form-field);
+    border: none;
+    border-bottom: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s) var(--radius-s) 0 0;
+    background-color: var(--background-primary-alt);
+    box-shadow: none;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease;
 
-    &:focus-within {
-        border-color: var(--background-modifier-border-focus);
+    &:hover {
+        border-bottom-color: var(--background-modifier-border-hover);
+    }
+
+    &:focus-within,
+    &:focus {
+        border-bottom-color: var(--interactive-accent);
+        background-color: var(--background-secondary);
+        box-shadow: 0 1px 0 0 var(--interactive-accent);
     }
 }
 
 .sr-typed-free-textarea {
     resize: vertical;
     min-height: 5em;
+    padding: var(--size-4-2) var(--size-4-3);
+    font-size: var(--font-text-size);
+}
+
+.is-single-line .sr-typed-free-textarea {
+    resize: none;
+    min-height: 0;
 }
 
 .sr-typed-free-editor {
     & .markdown-source-view.mod-cm6 .cm-scroller {
-        padding: var(--size-4-1) var(--size-4-2);
+        padding: var(--size-4-2) var(--size-4-3);
         max-height: 260px;
         overflow-y: auto;
     }
@@ -159,10 +166,21 @@
     &.is-empty:not(:focus-within)::before {
         content: attr(data-placeholder);
         position: absolute;
-        top: var(--size-4-1);
-        left: var(--size-4-2);
+        top: var(--size-4-2);
+        left: var(--size-4-3);
         color: var(--text-faint);
         pointer-events: none;
+    }
+}
+
+/* One line: no taller than its text */
+.is-single-line .sr-typed-free-editor .markdown-source-view.mod-cm6 {
+    & .cm-content {
+        min-height: 0;
+    }
+
+    & .cm-scroller {
+        max-height: none;
     }
 }
 
@@ -170,15 +188,63 @@
     max-height: 140px;
 }
 
+/* "check": a quiet link under the field, like the note box's "save" */
 .sr-typed-free-bar {
     display: flex;
     justify-content: flex-end;
 }
 
+.sr-typed-free-check {
+    font-size: var(--font-ui-small);
+    color: var(--text-muted);
+    text-decoration: none;
+    cursor: pointer;
+
+    &:hover {
+        color: var(--text-normal);
+        text-decoration: underline;
+    }
+}
+
 .sr-typed-free-key {
-    margin-left: var(--size-4-2);
-    opacity: 0.7;
-    font-size: var(--font-ui-smaller);
+    /* inline-block: the link's hover underline does not run through the badge */
+    display: inline-block;
+    margin-left: var(--size-4-1);
+    padding: 0 var(--size-2-2);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    font-size: var(--font-ui-smallest);
+    color: var(--text-faint);
+}
+
+.sr-typed-free-check:hover .sr-typed-free-key {
+    color: var(--text-muted);
+}
+
+/* A cloze blank: an underline in the line of text, in the same quiet look */
+.sr-card-container .sr-content .cloze-input {
+    height: auto;
+    min-width: 2.5em;
+    margin: 0 0.15em;
+    padding: 0 0.3em;
+    border: none;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+    border-radius: var(--radius-s) var(--radius-s) 0 0;
+    background-color: var(--background-primary-alt);
+    box-shadow: none;
+    font: inherit;
+    line-height: 1.4;
+    color: var(--text-normal);
+    vertical-align: baseline;
+    transition:
+        border-color 120ms ease,
+        background-color 120ms ease;
+
+    &:focus {
+        border-bottom-color: var(--interactive-accent);
+        background-color: var(--background-secondary);
+        box-shadow: 0 1px 0 0 var(--interactive-accent);
+    }
 }
 
 /* Your answer and the answer: one above the other (below, above), or side by side (left,

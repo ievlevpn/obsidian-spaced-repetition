@@ -50,7 +50,9 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   on a slider (from due only to new only), due otherwise. From a deck's menu it asks for the
   chance each time; in settings it is a slider under the card order.
 - Type the answer: switched on per session from the card menu. A card with a short plain-text
-  answer gets a field, and text cloze blanks become fields (math clozes do not). Ported from
+  answer gets a one-line field (an Obsidian editor with live preview; Enter checks), and text
+  cloze blanks become fields (math clozes do not). All of them share one quiet look: a soft fill
+  and an underline that takes the accent colour while typing. Ported from
   [Flashcard Studio](https://github.com/Almalkiid/flashcard-studio) (MIT), with a smarter
   comparison:
   - word by word: words are paired with words and letters compared within a pair, so a missing
