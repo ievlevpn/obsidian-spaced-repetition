@@ -240,6 +240,21 @@ describe("compareTypedAnswer: an answer listing alternatives", () => {
         expect(c.expected.map((p) => p.text).join("")).toEqual(answer);
     });
 
+    test("a word of one alternative beats more letters shared with another", () => {
+        const c = compareTypedAnswer(
+            "свернуться",
+            "свернуться клубочком, съёжиться, спрятаться",
+            false,
+        );
+        expect(c.alternative).toBe(true);
+        expect(c.typed).toEqual([{ kind: "ok", text: "свернуться" }]);
+        expect(c.expected).toEqual([
+            { kind: "ok", text: "свернуться" },
+            { kind: "missing", text: " клубочком" },
+            { kind: "other", text: ", съёжиться, спрятаться" },
+        ]);
+    });
+
     test("one right and one wrong is not exact", () => {
         expect(compareTypedAnswer("gloomy, happy", answer, false).exact).toBe(false);
     });

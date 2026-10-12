@@ -221,7 +221,7 @@ export function compareTypedAnswer(
         );
         let index = 0;
         comparisons.forEach((c, i) => {
-            if (c.similarity > comparisons[index].similarity) index = i;
+            if (closer(c, comparisons[index])) index = i;
         });
         return { index, comparison: comparisons[index] };
     });
@@ -257,7 +257,7 @@ export function compareTypedAnswer(
     }
 
     // One item, closer to an alternative than to the whole answer: marked against that one
-    if (typedItems.length === 1 && best[0].comparison.similarity > whole.similarity) {
+    if (typedItems.length === 1 && closer(best[0].comparison, whole)) {
         const { index, comparison } = best[0];
         return {
             exact: false,
@@ -273,6 +273,21 @@ export function compareTypedAnswer(
         };
     }
     return whole;
+}
+
+// How well a comparison matches, words first: exact, by typos only, every typed word in the
+// answer, and only then letters in common ("свернуться" is in "свернуться клубочком", though it
+// shares more letters with "спрятаться")
+function closeness(c: TypedComparison): number {
+    if (c.exact) return 3;
+    if (c.typosOnly === true) return 2;
+    return c.typedWordsInAnswer === true ? 1 : 0;
+}
+
+function closer(a: TypedComparison, b: TypedComparison): boolean {
+    const ca: number = closeness(a);
+    const cb: number = closeness(b);
+    return ca !== cb ? ca > cb : a.similarity > b.similarity;
 }
 
 // The typed text as parts: each item with its own parts, the separators between them "ok"
