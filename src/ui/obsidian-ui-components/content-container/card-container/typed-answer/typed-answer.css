@@ -73,19 +73,24 @@
     }
 }
 
-/* An answer too far off to mark letter by letter, shown as typed: beside the cloze answer, or
-   as the line above the card's answer */
+/* An answer too far off to mark letter by letter, shown as typed: beside the cloze answer (in
+   the quiet look of the answer fields: a soft fill, a faint underline, muted text), or as the
+   line above the card's answer */
 .sr-typed-yours {
     margin-inline-start: var(--size-4-1);
     padding: 0 var(--size-4-1);
-    border-radius: var(--radius-s);
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+    border-radius: var(--radius-s) var(--radius-s) 0 0;
+    background-color: var(--background-primary-alt);
     font-size: 0.85em;
+    font-weight: var(--font-normal);
+    font-style: normal;
     color: var(--text-muted);
-    background-color: rgba(var(--color-red-rgb), 0.1);
 
     &::before {
         content: "\270E\00a0";
         color: var(--text-faint);
+        opacity: 0.7;
     }
 }
 
