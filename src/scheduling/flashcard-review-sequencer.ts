@@ -403,6 +403,9 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
         this.pendingCards = [...entry.pendingCards];
         this.dueDateFlashcardHistogram.dueDatesMap = new Map(entry.histogram);
 
+        // Pending cards that have fallen due go back in now: left for the next card boundary,
+        // they would rebuild the queue there, and a random order would then draw another card
+        this.wakeDuePendingCards();
         this.cardSequencer.setIteratorTopicPath(this.currentTopicPath);
         if (!this.cardSequencer.jumpToRepItem(entry.card)) this.cardSequencer.nextRepItem();
         return true;

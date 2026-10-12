@@ -2294,6 +2294,40 @@ describe("undo", () => {
         expect(c.reviewSequencer.canUndo).toBe(false);
     });
 
+    test("undo returns to the card even when a pending card has fallen due (random order)", async () => {
+        const text = `#flashcards/a A::a <!--SR:!2023-09-02,4,270-->
+#flashcards/b B::b <!--SR:!2023-09-02,4,270-->
+#flashcards/c C::c <!--SR:!2023-09-02,4,270-->`;
+        const c = TestContext.Create(
+            {
+                repItemOrder: RepItemOrder.EveryCardRandomDeckAndCard,
+                deckOrder: DeckOrder.PrevDeckComplete_Sequential,
+            },
+            FlashcardReviewMode.Review,
+            sameLine,
+            text,
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        const reviewSequencer = c.reviewSequencer as FlashcardReviewSequencer;
+        // The first card answered goes on the pending list for a short step
+        const first: string = reviewSequencer.currentCard.front;
+        jest.spyOn(reviewSequencer, "determineCardSchedule").mockReturnValueOnce(
+            createPendingSchedule("2023-09-06T00:10:00.000Z"),
+        );
+        await reviewSequencer.processReview(ReviewResponse.Again);
+        const second: string = reviewSequencer.currentCard.front;
+        expect(second).not.toEqual(first);
+
+        setupStaticDateProviderOriginDatePlusDays(1);
+        reviewSequencer.skipCurrentCard();
+        await reviewSequencer.undo();
+
+        // The pending card is back in the queue already, so showing the card needs no rebuild of
+        // the queue (which would draw some other card at random)
+        expect(reviewSequencer.hasDuePendingCards).toBe(false);
+        expect(reviewSequencer.currentCard.front).toEqual(second);
+    });
+
     test("undo brings back buried siblings and clears the postponement it caused", async () => {
         const settings: SRSettings = { ...sameLine, burySiblingCards: true };
         const text = "#flashcards A ==b== and ==c==\n\n#flashcards Q2::A2";
