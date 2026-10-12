@@ -6,6 +6,7 @@ import { CardType } from "src/data/data-structures/card/questions/question";
 import { SRSettings } from "src/data/settings";
 import { t } from "src/lang/helpers";
 import { createEmbeddedMarkdownEditor } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
+import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { TextDirection } from "src/utils/strings";
 
 // One text field of the modal: an embedded Obsidian editor (live preview, latex-suite), or a
@@ -34,6 +35,7 @@ export class FlashcardEditModal extends Modal {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private rejectPromise: ((reason?: any) => void) | null = null;
     private didSaveChanges = false;
+    private didClose = false;
     private readonly modalText: string;
     private textDirection: TextDirection;
     private textFront: string = "";
@@ -116,7 +118,7 @@ export class FlashcardEditModal extends Modal {
         // (toggle checkbox); app hotkeys (bold, italic, ...) reach the editors through the parent.
         this.scope = new Scope(this.app.scope);
         this.scope.register([], "Escape", () => {
-            this.close();
+            this.cancel();
             return false;
         });
         this.scope.register(["Mod"], "Enter", () => {
@@ -167,12 +169,61 @@ export class FlashcardEditModal extends Modal {
             this.fieldBack = this.createField(this.textBack, filePath);
         }
         this.fieldFront.focus();
+        // Ahead of the editors (capture, on their ancestor): Esc cancels instead of only leaving
+        // the field, and Tab moves between the front and back fields
+        this.contentEl.addEventListener("keydown", this.fieldKeys, true);
+    }
+
+    private fieldKeys = (e: KeyboardEvent) => {
+        if (e.metaKey || e.ctrlKey || e.altKey || e.isComposing) return;
+        if (e.key === "Escape" && !e.shiftKey) {
+            e.preventDefault();
+            e.stopPropagation();
+            this.cancel();
+        } else if (e.key === "Tab" && this.fieldBack !== null && !editorWantsTab()) {
+            e.preventDefault();
+            e.stopPropagation();
+            const inFront: boolean =
+                this.fieldFront?.el.contains(activeDocument.activeElement) ?? false;
+            (inFront ? this.fieldBack : this.fieldFront)?.focus();
+        }
+    };
+
+    // Whether a field differs from what the modal opened with
+    private isChanged(): boolean {
+        return (
+            (this.fieldFront?.getValue() ?? this.textFront) !== this.textFront ||
+            (this.fieldBack?.getValue() ?? this.textBack) !== this.textBack
+        );
+    }
+
+    // Esc or Cancel: closes, asking first when something was changed (Enter discards)
+    private cancel(): void {
+        if (!this.isChanged()) {
+            this.close();
+            return;
+        }
+        const field: HTMLElement | null = activeDocument.activeElement as HTMLElement | null;
+        new ConfirmationModal(
+            this.app,
+            t("EDIT_DISCARD_TITLE"),
+            t("EDIT_DISCARD_DESC"),
+            undefined,
+            () => this.close(),
+        )
+            .confirmWithEnter()
+            .onClosed(() => {
+                if (this.didClose) return;
+                field?.focus();
+            })
+            .open();
     }
 
     /**
      * Closes the EditModal
      */
     onClose() {
+        this.didClose = true;
         super.onClose();
         this.resolveInput();
         this.editorHost.unload();
@@ -236,7 +287,7 @@ export class FlashcardEditModal extends Modal {
 
     private saveClickCallback = (_: MouseEvent) => this.save();
 
-    private cancelClickCallback = (_: MouseEvent) => this.close();
+    private cancelClickCallback = (_: MouseEvent) => this.cancel();
 
     private isAnyFieldEmpty(): boolean {
         const isBackEmpty = this.fieldBack !== null && this.fieldBack.getValue().length === 0;
@@ -260,7 +311,6 @@ export class FlashcardEditModal extends Modal {
             textarea.setRangeText("\t", currentCaretStartPosition, currentCaretEndPosition);
             textarea.setSelectionRange(newEndPosition, newEndPosition);
         }
-
     };
 
     private save() {
@@ -313,4 +363,31 @@ export class FlashcardEditModal extends Modal {
                 return null;
         }
     }
+}
+
+/**
+ * Whether Tab belongs to the editor where the cursor is: on a list line (indent) or inside
+ * math (Latex Suite's tabstops). Anywhere else it moves to the other field.
+ */
+function editorWantsTab(): boolean {
+    const selection: Selection | null = activeDocument.getSelection();
+    const node: Node | null = selection?.anchorNode ?? null;
+    const element: HTMLElement | null | undefined =
+        node instanceof HTMLElement ? node : node?.parentElement;
+    const line: HTMLElement | null | undefined = element?.closest(".cm-line");
+    const content: HTMLElement | null | undefined = element?.closest(".cm-content");
+    if (!line || !content || !selection || selection.rangeCount === 0) return false;
+    if (/^\s*([-*+]|\d+[.)])\s/.test(line.textContent ?? "")) return true;
+    // Math shown as source is the math being edited (the rest is rendered, without its
+    // dollars): an odd count of $$, or of $ on this line, before the cursor means inside it
+    const upTo = (from: Node): string => {
+        const range: Range = activeDocument.createRange();
+        range.setStart(from, 0);
+        range.setEnd(selection.anchorNode, selection.anchorOffset);
+        return range.toString().replace(/\\\$/g, "");
+    };
+    const blocks: number = (upTo(content).match(/\$\$/g) ?? []).length;
+    if (blocks % 2 === 1) return true;
+    const inline: number = (upTo(line).replace(/\$\$/g, "").match(/\$/g) ?? []).length;
+    return inline % 2 === 1;
 }

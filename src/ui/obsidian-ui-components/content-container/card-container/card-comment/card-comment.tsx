@@ -248,6 +248,12 @@ export default class CardCommentComponent {
         this.container.removeClass("sr-is-hidden");
     }
 
+    /** Opens the box if collapsed, without remembering that, and puts the cursor in it (N key). */
+    public openAndFocus(): void {
+        if (!this.isOpen) this.setOpen(true, false);
+        this.focus();
+    }
+
     /** Puts the cursor in the box, e.g. after saving, to write the next note. */
     public focus(): void {
         if (this.editor) this.editor.focus();

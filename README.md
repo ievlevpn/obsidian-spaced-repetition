@@ -80,7 +80,18 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   original plugin ignores.
 - Answer keys: the original layout (1 Hard, 2 Good, 3 Easy, 0 Reset) or Anki's (1 Again, 2 Hard,
   3 Good, 4 Easy), chosen in the settings. Ported from Flashcard Studio.
-- The edit card window uses the same embedded Obsidian editor as card notes.
+- The edit card window uses the same embedded Obsidian editor as card notes. Tab moves between
+  the front and back fields (except on a list line or inside math, where Tab stays with the editor
+  for indenting and latex-suite's tabstops), Mod+Enter saves, and Esc cancels, asking first if
+  something was changed.
+- The whole review works from the keyboard (desktop). On a card: `E` edit, `T` type answers on or
+  off, `N` write a note (answer side), `M` the card menu (arrow keys and Enter), `B` bury, `R`
+  reset (asks; Enter confirms), `C` card info, `Backspace` back to the deck list, `?` the list of
+  keys; besides Space/Enter, the digits, `S` skip, `U` undo, `I` important and `J` jump to the
+  note. Suspend and delete stay in the card menu. In the deck list: arrow keys move between decks
+  and open or close subdecks, Enter reviews, `M` (or the menu key) opens the deck's menu.
+- Type answers by default in some decks: _Type answers in this deck_ in a deck's menu. Subdecks
+  follow the nearest deck above them that is set either way; `T` still switches it for a session.
 
 **Card notes**
 

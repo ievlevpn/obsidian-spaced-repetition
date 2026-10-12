@@ -1,5 +1,5 @@
 import "src/ui/obsidian-ui-components/content-container/deck-container/deck-list.css";
-import { setIcon } from "obsidian";
+import { Platform, setIcon } from "obsidian";
 
 import { Deck } from "src/data/data-structures/deck/deck";
 import { SRSettings } from "src/data/settings";
@@ -11,7 +11,28 @@ import {
     showCardOrderMenu,
 } from "src/ui/obsidian-ui-components/content-container/deck-container/card-order-menu";
 
+/** The decks' "type answers" default, read and set from a deck's menu. */
+export interface DeckTypingAccess {
+    isOn(deck: Deck): boolean;
+    set(deck: Deck, on: boolean): Promise<void>;
+}
+
+// What the keyboard needs of a deck's row
+interface RowControl {
+    deck: Deck;
+    clickable: boolean;
+    hasSubdecks: () => boolean;
+    isCollapsed: () => boolean;
+    setCollapsed: (collapsed: boolean) => void;
+    openMenu: () => void;
+}
+
 export default class DeckListComponent {
+    private rowControls = new WeakMap<HTMLElement, RowControl>();
+    // The deck whose row has the keyboard focus, kept across redraws by its path
+    private selectedPath: string | null = null;
+    private deckTyping: DeckTypingAccess;
+
     private scrollWrapper: HTMLDivElement;
     private content: HTMLDivElement;
     private treeContainer: HTMLDivElement;
@@ -35,8 +56,10 @@ export default class DeckListComponent {
     public constructor(
         parentEl: HTMLElement,
         startReviewOfDeck: (deck: Deck, options?: DeckReviewOptions) => void,
+        deckTyping: DeckTypingAccess,
     ) {
         this.startReviewOfDeck = startReviewOfDeck;
+        this.deckTyping = deckTyping;
         // Prep main container
         this.scrollWrapper = parentEl.createDiv();
         this.scrollWrapper.addClass("sr-scroll-wrapper");
@@ -111,7 +134,99 @@ export default class DeckListComponent {
 
         // Prep tree container
         this.treeContainer = this.content.createDiv("sr-tree-container");
+        this.treeContainer.addEventListener("keydown", this.keydown);
+        this.treeContainer.addEventListener("focusin", (e: FocusEvent) => {
+            const control: RowControl | undefined = this.rowControls.get(e.target as HTMLElement);
+            if (control) this.selectedPath = control.deck.getTopicPath().path.join("/");
+        });
     }
+
+    // The rows that can be reached: decks not inside a collapsed deck
+    private visibleRows(): HTMLElement[] {
+        return Array.from(
+            this.treeContainer.querySelectorAll<HTMLElement>(".sr-tree-item-row"),
+        ).filter((row) => row.offsetParent !== null && this.rowControls.has(row));
+    }
+
+    /**
+     * Puts the keyboard focus on the deck that had it (or the first), so the list can be used
+     * from the keyboard. Not on a touch screen, where it would only draw a focus ring.
+     */
+    public focusSelectedRow(): void {
+        if (Platform.isMobile) return;
+        const rows: HTMLElement[] = this.visibleRows();
+        const row: HTMLElement | undefined =
+            rows.find(
+                (r) =>
+                    this.rowControls.get(r)?.deck.getTopicPath().path.join("/") ===
+                    this.selectedPath,
+            ) ?? rows[0];
+        row?.focus({ preventScroll: false });
+    }
+
+    // Up/Down move, Right/Left open or close subdecks (or go into/out of them), Enter or Space
+    // reviews, M or the menu key opens the deck's menu
+    private keydown = (e: KeyboardEvent) => {
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
+        const row: HTMLElement | null = (e.target as HTMLElement).closest(".sr-tree-item-row");
+        const control: RowControl | undefined = row ? this.rowControls.get(row) : undefined;
+        // A row keeps the focus while the list is hidden for a review: the review's keys then
+        // are not the list's
+        if (!row || !control || row.offsetParent === null) return;
+        const rows: HTMLElement[] = this.visibleRows();
+        const at: number = rows.indexOf(row);
+        const move = (to: HTMLElement | undefined) => to?.focus();
+        let handled = true;
+        switch (e.key) {
+            case "ArrowDown":
+                move(rows[at + 1]);
+                break;
+            case "ArrowUp":
+                move(rows[at - 1]);
+                break;
+            case "Home":
+                move(rows[0]);
+                break;
+            case "End":
+                move(rows[rows.length - 1]);
+                break;
+            case "ArrowRight":
+                if (!control.hasSubdecks()) break;
+                if (control.isCollapsed()) control.setCollapsed(false);
+                else move(this.visibleRows()[at + 1]);
+                break;
+            case "ArrowLeft":
+                if (control.hasSubdecks() && !control.isCollapsed()) control.setCollapsed(true);
+                else
+                    move(
+                        row.parentElement
+                            ?.closest(".tree-item-children")
+                            ?.parentElement?.querySelector<HTMLElement>(
+                                ":scope > .sr-tree-item-row",
+                            ) ?? undefined,
+                    );
+                break;
+            case "Enter":
+            case " ":
+                if (control.clickable) this.startReviewOfDeck(control.deck);
+                break;
+            case "m":
+            case "M":
+            case "ContextMenu":
+                control.openMenu();
+                break;
+            case "F10":
+                if (e.shiftKey) control.openMenu();
+                else handled = false;
+                break;
+            default:
+                handled = false;
+        }
+        if (handled) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    };
 
     /**
      * Redraws the deck list.
@@ -260,12 +375,36 @@ export default class DeckListComponent {
             });
             // Right-click (long-press on a phone): review this deck in another order, or only its
             // important cards, this time only. Also on decks with nothing due: important cards can
-            // be reviewed whenever.
-            attachContextMenu(treeRowSelf, (position) =>
-                showCardOrderMenu(position, this.defaultCardOrder, (options) =>
-                    startReviewOfDeck(deck, options),
-                ),
-            );
+            // be reviewed whenever. And whether its reviews start with typing answers on.
+            const openMenu = (position: { x: number; y: number }) =>
+                showCardOrderMenu(
+                    position,
+                    this.defaultCardOrder,
+                    (options) => startReviewOfDeck(deck, options),
+                    {
+                        on: this.deckTyping.isOn(deck),
+                        set: (on: boolean) => void this.deckTyping.set(deck, on),
+                    },
+                );
+            attachContextMenu(treeRowSelf, openMenu);
+
+            // The keyboard: the row takes focus (from the arrow keys, not Tab)
+            treeRowSelf.tabIndex = -1;
+            this.rowControls.set(treeRowSelf, {
+                deck,
+                clickable: treeRowSelf.hasClass("is-clickable"),
+                hasSubdecks: () => numOfSubdecks > 0,
+                isCollapsed: () => collapsed,
+                setCollapsed: (value: boolean) => {
+                    collapsed = value;
+                    collapseIconEl.toggleClass("is-collapsed", value);
+                    treeRowChildren.setCssProps({ display: value ? "none" : "block" });
+                },
+                openMenu: () => {
+                    const rect: DOMRect = treeRowSelf.getBoundingClientRect();
+                    openMenu({ x: rect.left + 24, y: rect.bottom });
+                },
+            });
         }
 
         this._createStatsInRow(treeRowOuter, deckStats);
