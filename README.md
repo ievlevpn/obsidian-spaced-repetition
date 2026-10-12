@@ -83,7 +83,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
 - The edit card window uses the same embedded Obsidian editor as card notes. Tab moves between
   the front and back fields (except on a list line or inside math, where Tab stays with the editor
   for indenting and latex-suite's tabstops), Mod+Enter saves, and Esc cancels, asking first if
-  something was changed.
+  something was changed. Save and Cancel show their keys (⌘↵ / Ctrl+↵, Esc) in the corner, like
+  the rating buttons.
 - The whole review works from the keyboard (desktop). On a card: `E` edit, `T` type answers on or
   off, `N` write a note (answer side), `M` the card menu (arrow keys and Enter), `B` bury, `R`
   reset (asks; Enter confirms), `C` card info, `Backspace` back to the deck list, `?` the list of
