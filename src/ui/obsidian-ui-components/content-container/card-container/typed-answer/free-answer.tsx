@@ -1,16 +1,18 @@
-import { App, ButtonComponent, Component, Platform, Scope } from "obsidian";
+import { App, Component, Platform, Scope } from "obsidian";
 
 import { t } from "src/lang/helpers";
 import { createEmbeddedMarkdownEditor } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import { TextDirection } from "src/utils/strings";
 
 /**
- * A box for typing the answer to a card that cannot be checked letter by letter (a long or
- * multi-line answer, math, a cloze card whose blanks are all math). Nothing is compared: on the
- * back what was typed is shown beside the answer, for judging oneself.
+ * The field for typing the answer: an embedded Obsidian editor (live preview, latex-suite), or a
+ * plain text box when that is unavailable. Check (or Mod+Enter) shows the answer; Esc leaves the
+ * field.
  *
- * It is an embedded Obsidian editor (live preview, latex-suite), or a plain text box when that is
- * unavailable. Check (or Mod+Enter) shows the answer; Esc leaves the box.
+ * Single line, for a short plain-text answer that is compared letter by letter: Enter checks.
+ * Otherwise a box for an answer that cannot be checked that way (a long or multi-line answer,
+ * math, a cloze card whose blanks are all math): on the back what was typed is shown beside the
+ * answer, for judging oneself.
  */
 export class FreeAnswerBox {
     private app: App;
@@ -24,10 +26,17 @@ export class FreeAnswerBox {
         app: App,
         owner: Component,
         parentEl: HTMLElement,
-        opts: { notePath: string; onCheck: () => void; textDirection?: TextDirection },
+        opts: {
+            notePath: string;
+            onCheck: () => void;
+            textDirection?: TextDirection;
+            singleLine?: boolean;
+        },
     ) {
         this.app = app;
+        const singleLine: boolean = opts.singleLine === true;
         const wrap = parentEl.createDiv("sr-typed-free");
+        wrap.toggleClass("is-single-line", singleLine);
         if (opts.textDirection === TextDirection.Rtl) wrap.setAttribute("dir", "rtl");
 
         const editor = createEmbeddedMarkdownEditor(
@@ -41,13 +50,25 @@ export class FreeAnswerBox {
         if (editor) {
             editor.setFilePath(opts.notePath);
             inputEl = editor.el;
+            // An answer, not prose: no spelling marks, and no capital forced at its start
+            const content: HTMLElement | null = editor.el.querySelector(".cm-content");
+            content?.setAttribute("spellcheck", "false");
+            content?.setAttribute("autocapitalize", "off");
+            content?.setAttribute("autocorrect", "off");
+            if (singleLine) content?.setAttribute("enterkeyhint", "go");
             this.getText = () => editor.getValue();
             this.focusInput = () => editor.focus();
             this.destroyInput = () => editor.destroy();
         } else {
             const textarea = wrap.createEl("textarea", {
                 cls: "sr-typed-free-textarea",
-                attr: { placeholder: t("TYPED_ANSWER_PLACEHOLDER"), rows: 3 },
+                attr: {
+                    placeholder: t("TYPED_ANSWER_PLACEHOLDER"),
+                    rows: singleLine ? 1 : 3,
+                    spellcheck: "false",
+                    autocapitalize: "off",
+                    autocorrect: "off",
+                },
             });
             inputEl = textarea;
             this.getText = () => textarea.value;
@@ -55,15 +76,20 @@ export class FreeAnswerBox {
             this.destroyInput = () => textarea.remove();
         }
 
+        // A quiet link, like the note box's "save"
         const bar = wrap.createDiv("sr-typed-free-bar");
-        const check = new ButtonComponent(bar)
-            .setButtonText(t("TYPED_FREE_CHECK"))
-            .setCta()
-            .onClick(() => opts.onCheck());
+        const check = bar.createEl("a", {
+            cls: "sr-typed-free-check",
+            text: t("TYPED_FREE_CHECK"),
+        });
+        check.addEventListener("click", (e: MouseEvent) => {
+            e.preventDefault();
+            opts.onCheck();
+        });
         if (!Platform.isPhone) {
-            check.buttonEl.createSpan({
+            check.createSpan({
                 cls: "sr-typed-free-key",
-                text: Platform.isMacOS ? "⌘↵" : "Ctrl+↵",
+                text: singleLine ? "↵" : Platform.isMacOS ? "⌘↵" : "Ctrl+↵",
             });
         }
 
@@ -74,6 +100,13 @@ export class FreeAnswerBox {
             opts.onCheck();
             return false;
         });
+        if (singleLine) {
+            this.scope.register([], "Enter", (e: KeyboardEvent) => {
+                if (e.isComposing) return true;
+                opts.onCheck();
+                return false;
+            });
+        }
         this.scope.register([], "Escape", () => {
             const focused = inputEl.doc.activeElement;
             if (focused instanceof HTMLElement && inputEl.contains(focused)) focused.blur();

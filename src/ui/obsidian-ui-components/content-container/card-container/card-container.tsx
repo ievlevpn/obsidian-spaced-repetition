@@ -29,7 +29,6 @@ import { CardMarkerActions } from "src/ui/obsidian-ui-components/content-contain
 import { FreeAnswerBox } from "src/ui/obsidian-ui-components/content-container/card-container/typed-answer/free-answer";
 import {
     addDiffParts,
-    renderTypedInput,
     renderTypedResult,
 } from "src/ui/obsidian-ui-components/content-container/card-container/typed-answer/typed-answer";
 import {
@@ -76,7 +75,8 @@ export class CardContainer {
     // Typing the answer, switched on from the card menu for the current session. Cloze blanks
     // become fields; a card with a short plain-text answer gets a field under its question.
     private typeAnswers: boolean = false;
-    private typedInput: HTMLInputElement | null = null;
+    // The single-line field of a short plain-text answer
+    private typedInput: FreeAnswerBox | null = null;
     private typedTarget: string | null = null;
     // While typing answers, the box for an answer that cannot be checked letter by letter
     private freeAnswer: FreeAnswerBox | null = null;
@@ -439,6 +439,7 @@ export class CardContainer {
     // A field under the question of a non-cloze card whose answer is short plain text; for any
     // other card (and a cloze card whose blanks are all math, so have no fields), a free box
     private drawTypedInput(sessionData: SessionData, settings: SRSettings): void {
+        this.typedInput?.destroy();
         this.typedInput = null;
         this.typedTarget = null;
         this.destroyFreeAnswer();
@@ -454,9 +455,11 @@ export class CardContainer {
             this.drawFreeAnswer(sessionData);
             return;
         }
-        this.typedInput = renderTypedInput(this.content, {
-            onSubmit: () => this.showAnswerHandler(),
+        this.typedInput = new FreeAnswerBox(this.app, this.plugin, this.content, {
+            notePath: sessionData.currentNote.filePath,
+            onCheck: () => this.showAnswerHandler(),
             textDirection: sessionData.currentQuestion.questionText.textDirection,
+            singleLine: true,
         });
         this.typedInput.focus();
     }
@@ -699,8 +702,9 @@ export class CardContainer {
         this.toolbar.setResetButtonDisabled(false);
 
         // Read the typed answer before the front, and with it the field, is redrawn
-        const typedText: string = this.typedInput?.value ?? "";
+        const typedText: string = this.typedInput?.text ?? "";
         const typedTarget: string | null = this.typedTarget;
+        this.typedInput?.destroy();
         this.typedInput = null;
         this.typedTarget = null;
         let typedExact: boolean | null = null;
