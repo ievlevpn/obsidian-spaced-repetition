@@ -150,3 +150,34 @@ describe("removeFootnoteDefinition", () => {
         expect(removeFootnoteDefinition("no footnotes", "sr-a3f91c")).toBe("no footnotes");
     });
 });
+
+describe("an entry of two paragraphs", () => {
+    // How the plugin writes the empty line between paragraphs: an all-space line
+    const def = "[^sr-a3f91c]: - *2026-10-11:* First.\n      \n      Second.";
+    const text = `Q1:::A1 [^sr-a3f91c]\n\n${def}\n\n[^sr-b7102e]: - *2026-10-11:* other\n`;
+
+    test("is found and collected whole", () => {
+        expect(findFootnoteDefinition(text, "sr-a3f91c")).toEqual(def);
+        expect(collectCardCommentDefinitions(text).get("sr-a3f91c")).toEqual(def);
+    });
+
+    test("is replaced whole, so an added entry goes after both paragraphs", () => {
+        const added = def + "\n    - *2026-10-12:* Third";
+        expect(upsertFootnoteDefinition(text, "sr-a3f91c", added)).toEqual(
+            `Q1:::A1 [^sr-a3f91c]\n\n${added}\n\n[^sr-b7102e]: - *2026-10-11:* other\n`,
+        );
+    });
+
+    test("is removed whole", () => {
+        expect(removeFootnoteDefinition(text, "sr-a3f91c")).toEqual(
+            "Q1:::A1 [^sr-a3f91c]\n\n[^sr-b7102e]: - *2026-10-11:* other\n",
+        );
+    });
+
+    test("a truly empty line still ends a definition", () => {
+        const glued = "[^sr-a3f91c]: - *2026-10-11:* First.\n\n      indented prose\n";
+        expect(findFootnoteDefinition(glued, "sr-a3f91c")).toEqual(
+            "[^sr-a3f91c]: - *2026-10-11:* First.",
+        );
+    });
+});

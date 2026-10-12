@@ -1,4 +1,4 @@
-import { isFootnoteContinuationLine, isFootnoteDefinitionLine } from "src/utils/card-comment";
+import { footnoteDefinitionEnd, isFootnoteDefinitionLine } from "src/utils/card-comment";
 
 // At most 3 leading spaces, markdown's limit for a footnote definition. Unbounded whitespace
 // would match our own indented entry (4 spaces) and continuation (6 spaces) lines, and any
@@ -23,8 +23,7 @@ function findDefinitionRange(lines: string[], label: string): [number, number] |
         const match = lines[i].match(LABEL_REGEX);
         if (!match || match[1] !== label) continue;
 
-        let end = i + 1;
-        while (end < lines.length && isFootnoteContinuationLine(lines[end])) end++;
+        const end: number = footnoteDefinitionEnd(lines, i);
         return [i, end];
     }
     return null;
@@ -109,8 +108,7 @@ export function collectCardCommentDefinitions(noteText: string): Map<string, str
         const match = lines[i].match(LABEL_REGEX);
         if (!match || !CARD_COMMENT_LABEL_REGEX.test(match[1])) continue;
 
-        let end = i + 1;
-        while (end < lines.length && isFootnoteContinuationLine(lines[end])) end++;
+        const end: number = footnoteDefinitionEnd(lines, i);
         map.set(match[1], lines.slice(i, end).join("\n"));
         i = end - 1;
     }

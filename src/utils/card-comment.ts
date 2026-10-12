@@ -57,6 +57,27 @@ export function isFootnoteContinuationLine(line: string): boolean {
     return /^[ \t]+\S/.test(line);
 }
 
+/**
+ * Index of the first line after the footnote definition that opens at `start`: its continuation
+ * lines run on, and so does an all-space line with a continuation line after it. That is how
+ * formatCardCommentDefinition writes the empty line between two paragraphs of an entry, and
+ * a truly empty line still ends the definition.
+ */
+export function footnoteDefinitionEnd(lines: string[], start: number): number {
+    let end = start + 1;
+    while (end < lines.length) {
+        if (isFootnoteContinuationLine(lines[end])) end++;
+        else if (
+            /^[ \t]+$/.test(lines[end]) &&
+            end + 1 < lines.length &&
+            isFootnoteContinuationLine(lines[end + 1])
+        )
+            end += 2;
+        else break;
+    }
+    return end;
+}
+
 export function formatCardCommentRef(label: string): string {
     return `[^${label}]`;
 }
@@ -102,11 +123,18 @@ export function parseCardCommentDefinition(definition: string): CardCommentEntry
     const entries: CardCommentEntry[] = [];
     const rawLines = definition.replaceAll("\r\n", "\n").split("\n");
 
+    // An empty line inside an entry (between its paragraphs), kept once text follows it
+    let emptyLine = false;
     rawLines.forEach((rawLine, idx) => {
         // The first line carries the "[^label]: " prefix; strip it before matching
         const body = idx === 0 ? rawLine.replace(DEFINITION_LINE_REGEX, "").trimStart() : rawLine;
         const trimmed = body.trim();
-        if (trimmed.length === 0) return;
+        if (trimmed.length === 0) {
+            emptyLine = entries.length > 0;
+            return;
+        }
+        const paragraphBreak: boolean = emptyLine;
+        emptyLine = false;
 
         const dated = trimmed.match(DATED_ENTRY_REGEX);
         if (dated) {
@@ -125,7 +153,8 @@ export function parseCardCommentDefinition(definition: string): CardCommentEntry
             // indentation is discarded here and re-emitted at the single uniform
             // CONTINUATION_INDENT by formatCardCommentDefinition - see the limitation noted
             // on isFootnoteContinuationLine.
-            entries[entries.length - 1].text += "\n" + unescapeLine(trimmed);
+            entries[entries.length - 1].text +=
+                (paragraphBreak ? "\n\n" : "\n") + unescapeLine(trimmed);
         } else {
             // A hand-written definition with no bullet at all
             entries.push({ date: "", text: unescapeLine(trimmed) });

@@ -848,6 +848,15 @@ test("Test footnote definitions are skipped entirely", () => {
         ),
     ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
 
+    // Nor the second paragraph of an entry, after the all-space line the plugin writes
+    // between paragraphs
+    expect(
+        parseT(
+            "Q1:::A1 [^sr-a3f91c]\n\n[^sr-a3f91c]: - *2026-10-03:* one\n      \n      two {{x}}\n",
+            parserOptions,
+        ),
+    ).toEqual([[CardType.SingleLineReversed, "Q1:::A1 [^sr-a3f91c]", 0, 0]]);
+
     // A definition directly under a multi line card must not be absorbed into it, and the
     // definition line TERMINATES the card, so lastLineNum is the card's true last content
     // line (2) and not the definition's. It used to be inflated to one past the definition
