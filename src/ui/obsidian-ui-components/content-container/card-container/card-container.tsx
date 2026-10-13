@@ -1,6 +1,6 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-container.css";
 import moment from "moment";
-import { App, Notice, Platform, Scope } from "obsidian";
+import { App, MarkdownRenderer, Notice, Platform, Scope } from "obsidian";
 
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { CardFrontBackUtil } from "src/data/data-structures/card/questions/question-type";
@@ -767,6 +767,21 @@ export class CardContainer {
      *
      * @returns Whether every blank was typed exactly, or null when nothing was typed
      */
+    /**
+     * Renders typed markdown (math, emphasis) in place of its plain text, inline: the rendered
+     * paragraph's contents replace the element's text. Plain text is left as it is.
+     */
+    private renderInline(el: HTMLElement, text: string): void {
+        if (!/[$*_`\\[]/.test(text)) return;
+        const path: string = this.frontArgs?.sessionData.currentNote.filePath ?? "";
+        const tmp: HTMLDivElement = createDiv();
+        void MarkdownRenderer.render(this.app, text, tmp, path, this.plugin).then(() => {
+            const source: Element = tmp.querySelector("p") ?? tmp;
+            el.empty();
+            while (source.firstChild) el.appendChild(source.firstChild);
+        });
+    }
+
     private _evaluateClozeAnswers(): boolean | null {
         this.clozeAnswers = activeDocument.querySelectorAll(".cloze-answer");
         if (this.clozeInputs === null || this.clozeAnswers.length !== this.clozeInputs.length) {
@@ -791,11 +806,12 @@ export class CardContainer {
             const hasMath: boolean = clozeAnswer.querySelector("mjx-container, .math") !== null;
             if (!comparison.exact && (hasMath || !worthMarking(comparison))) {
                 if (typed[i].trim() !== "") {
-                    clozeAnswer.createSpan({
+                    const yours: HTMLElement = clozeAnswer.createSpan({
                         cls: "sr-typed-yours",
                         text: typed[i].trim(),
                         attr: { "aria-label": t("TYPED_YOUR_ANSWER") },
                     });
+                    this.renderInline(yours, typed[i].trim());
                 }
                 continue;
             }
