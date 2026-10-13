@@ -65,6 +65,7 @@ export interface IBaseLocale {
     TYPED_ANSWER_PLACEHOLDER: string;
     TYPED_FREE_CHECK: string;
     TYPED_YOUR_ANSWER: string;
+    TYPED_YOURS_TAG: string;
     TYPED_TRUE_ANSWER: string;
     REVIEW_IMPORTANT_CARDS: string;
     NO_IMPORTANT_CARDS: string;

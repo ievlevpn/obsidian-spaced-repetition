@@ -77,20 +77,32 @@
    the quiet look of the answer fields: a soft fill, a faint underline, muted text), or as the
    line above the card's answer */
 .sr-typed-yours {
-    margin-inline-start: var(--size-4-1);
-    padding: 0 var(--size-4-1);
-    border-bottom: 1px solid var(--background-modifier-border-hover);
-    border-radius: var(--radius-s) var(--radius-s) 0 0;
-    background-color: var(--background-primary-alt);
-    font-size: 0.85em;
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.4em;
+    margin-inline-start: 0.4em;
+    padding: 0.05em 0.55em 0.1em;
+    border: 1px solid var(--background-modifier-border);
+    border-radius: 999px;
+    background-color: var(--background-secondary);
+    font-size: 0.88em;
     font-weight: var(--font-normal);
     font-style: normal;
     color: var(--text-muted);
+    vertical-align: baseline;
 
+    /* A tiny tag, like the "Your answer" headings beside a free answer */
     &::before {
-        content: "\270E\00a0";
+        content: attr(data-label);
+        font-size: 0.68em;
+        font-weight: var(--font-semibold);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
         color: var(--text-faint);
-        opacity: 0.7;
+    }
+
+    & mjx-container {
+        color: var(--text-muted);
     }
 }
 

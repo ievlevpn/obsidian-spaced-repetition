@@ -809,7 +809,10 @@ export class CardContainer {
                     const yours: HTMLElement = clozeAnswer.createSpan({
                         cls: "sr-typed-yours",
                         text: typed[i].trim(),
-                        attr: { "aria-label": t("TYPED_YOUR_ANSWER") },
+                        attr: {
+                            "aria-label": t("TYPED_YOUR_ANSWER"),
+                            "data-label": t("TYPED_YOURS_TAG"),
+                        },
                     });
                     this.renderInline(yours, typed[i].trim());
                 }
