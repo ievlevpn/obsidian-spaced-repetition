@@ -93,6 +93,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   keys; besides Space/Enter, the digits, `S` skip, `U` undo, `I` important and `J` jump to the
   note. Suspend and delete stay in the card menu. In the deck list: arrow keys move between decks
   and open or close subdecks, Enter reviews, `M` (or the menu key) opens the deck's menu.
+  In any answer field (a cloze blank, the typed answer, the note box) Esc only leaves the field, so
+  the review keys work again (`S` to skip, ...); it never closes the review window.
 - Type answers by default in some decks: _Type answers in this deck_ in a deck's menu. Subdecks
   follow the nearest deck above them that is set either way; `T` still switches it for a session.
 
