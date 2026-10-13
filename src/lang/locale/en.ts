@@ -69,6 +69,7 @@ const en: IBaseLocale = {
     TYPED_ANSWER_PLACEHOLDER: "Type the answer",
     TYPED_FREE_CHECK: "Check",
     TYPED_YOUR_ANSWER: "Your answer",
+    TYPED_YOURS_TAG: "you",
     TYPED_TRUE_ANSWER: "Answer",
     REVIEW_IMPORTANT_CARDS: "Review important cards",
     NO_IMPORTANT_CARDS: "This deck has no important cards.",
