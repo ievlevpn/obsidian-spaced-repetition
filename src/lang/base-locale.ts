@@ -358,6 +358,8 @@ export interface IBaseLocale {
     TYPED_LAYOUT_ABOVE: string;
     TYPED_LAYOUT_LEFT: string;
     TYPED_LAYOUT_RIGHT: string;
+    CLOZE_LIVE_PREVIEW: string;
+    CLOZE_LIVE_PREVIEW_DESC: string;
 
     // sidebar.ts
     NOTES_REVIEW_QUEUE: string;

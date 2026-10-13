@@ -135,6 +135,19 @@ export class UIPreferencesPage extends SettingsPage {
             })
             .addSetting((setting: Setting) => {
                 setting
+                    .setName(t("CLOZE_LIVE_PREVIEW"))
+                    .setDesc(t("CLOZE_LIVE_PREVIEW_DESC"))
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(this.settingsManager.settings.clozeLivePreview)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.clozeLivePreview = value;
+                                await this.settingsManager.save();
+                            }),
+                    );
+            })
+            .addSetting((setting: Setting) => {
+                setting
                     .setName(t("ANSWER_KEYS"))
                     .setDesc(t("ANSWER_KEYS_DESC"))
                     .addDropdown((dropdown) =>

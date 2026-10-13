@@ -35,6 +35,10 @@ import {
     CardState,
     SessionData,
 } from "src/ui/obsidian-ui-components/content-container/content-manager";
+import {
+    createEmbeddedMarkdownEditor,
+    EmbeddedMarkdownEditor,
+} from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { ReviewKeysModal } from "src/ui/obsidian-ui-components/modals/review-keys-modal";
 import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
@@ -75,6 +79,11 @@ export class CardContainer {
     // review keys back) instead of reaching the review window, which it would close
     private clozeScope: Scope;
     private clozeScopePushed: boolean = false;
+    // "Live preview in cloze blanks": an Obsidian editor in each blank (desktop), each one copying
+    // what is typed into the blank's hidden field, which the answer is checked from
+    private clozeEditors: EmbeddedMarkdownEditor[] = [];
+    private clozeEditorScope: Scope;
+    private clozeEditorScopePushed: boolean = false;
 
     // Typing the answer, switched on from the card menu for the current session. Cloze blanks
     // become fields; a card with a short plain-text answer gets a field under its question.
@@ -133,6 +142,19 @@ export class CardContainer {
             const focused: Element | null = activeDocument.activeElement;
             if (focused instanceof HTMLElement && focused.hasClass("cloze-input")) focused.blur();
             this.popClozeScope();
+            return false;
+        });
+
+        // While an editor blank has focus: Enter checks the answer, Esc leaves the blank
+        this.clozeEditorScope = new Scope(app.scope);
+        this.clozeEditorScope.register([], "Enter", (e: KeyboardEvent) => {
+            if (e.isComposing) return true;
+            this.blurClozeEditor();
+            this.showAnswerHandler();
+            return false;
+        });
+        this.clozeEditorScope.register([], "Escape", () => {
+            this.blurClozeEditor();
             return false;
         });
 
@@ -387,6 +409,7 @@ export class CardContainer {
 
     public async drawCardFront(sessionData: SessionData, settings: SRSettings) {
         this.popClozeScope();
+        this.destroyClozeEditors();
         this.frontArgs = { sessionData, settings };
         this.toolbar.setResetButtonDisabled(true);
         // Update current deck info
@@ -404,16 +427,10 @@ export class CardContainer {
         this.response.resetResponseButtons();
 
         // Setup cloze input listeners
-        this._setupClozeInputListeners();
+        this._setupClozeInputListeners(settings);
 
         // auto-focus the first cloze input if this card is a cloze card
-        if (sessionData.currentQuestion.questionType === CardType.Cloze) {
-            const firstInput: HTMLInputElement | null =
-                activeDocument.querySelector(".cloze-input");
-            if (firstInput) {
-                firstInput.focus();
-            }
-        }
+        if (sessionData.currentQuestion.questionType === CardType.Cloze) this.focusFirstBlank();
     }
 
     /**
@@ -651,8 +668,81 @@ export class CardContainer {
         this.clozeScopePushed = false;
     }
 
-    private _setupClozeInputListeners(): void {
+    /** Puts the cursor in the first cloze blank (its editor, with live preview on); false if none. */
+    private focusFirstBlank(): boolean {
+        if (this.clozeEditors.length > 0) {
+            this.clozeEditors[0].focus();
+            return true;
+        }
+        const first: HTMLInputElement | null =
+            this.content.querySelector<HTMLInputElement>(".cloze-input");
+        first?.focus();
+        return first !== null;
+    }
+
+    private blurClozeEditor(): void {
+        const focused: Element | null = activeDocument.activeElement;
+        if (focused instanceof HTMLElement && focused.closest(".sr-cloze-live")) focused.blur();
+        this.popClozeEditorScope();
+    }
+
+    private popClozeEditorScope(): void {
+        if (!this.clozeEditorScopePushed) return;
+        this.app.keymap.popScope(this.clozeEditorScope);
+        this.clozeEditorScopePushed = false;
+    }
+
+    private destroyClozeEditors(): void {
+        this.popClozeEditorScope();
+        for (const editor of this.clozeEditors) editor.destroy();
+        this.clozeEditors = [];
+    }
+
+    /**
+     * Swaps each cloze blank for an inline Obsidian editor (live preview, latex-suite). The blank's
+     * field stays, hidden inside, and gets what is typed; the answer is still checked from it.
+     */
+    private setUpClozeEditors(notePath: string): void {
+        this.clozeInputs?.forEach((input) => {
+            const wrap: HTMLSpanElement = createSpan({ cls: "sr-cloze-live" });
+            wrap.setCssProps({ width: `${Math.max(input.size, 3) + 2}ch` });
+            input.replaceWith(wrap);
+            const editor = createEmbeddedMarkdownEditor(
+                this.app,
+                this.plugin,
+                wrap,
+                "sr-cloze-live-editor",
+                "",
+            );
+            if (editor === null) {
+                wrap.replaceWith(input);
+                return;
+            }
+            editor.setFilePath(notePath);
+            input.addClass("sr-cloze-live-field");
+            wrap.prepend(input);
+            const sync = () => (input.value = editor.getValue());
+            editor.el.addEventListener("input", sync);
+            editor.el.addEventListener("keyup", sync);
+            editor.el.addEventListener("focusin", () => {
+                if (this.clozeEditorScopePushed) return;
+                this.app.keymap.pushScope(this.clozeEditorScope);
+                this.clozeEditorScopePushed = true;
+            });
+            editor.el.addEventListener("focusout", (e: FocusEvent) => {
+                const next = e.relatedTarget as HTMLElement | null;
+                if (!next?.closest?.(".sr-cloze-live")) this.popClozeEditorScope();
+            });
+            this.clozeEditors.push(editor);
+        });
+    }
+
+    private _setupClozeInputListeners(settings: SRSettings): void {
         this.clozeInputs = activeDocument.querySelectorAll(".cloze-input");
+        if (settings.clozeLivePreview && !Platform.isMobile && this.frontArgs !== null) {
+            this.setUpClozeEditors(this.frontArgs.sessionData.currentNote.filePath);
+            if (this.clozeEditors.length > 0) return;
+        }
 
         this.clozeInputs.forEach((input) => {
             input.addEventListener("focus", () => this.pushClozeScope());
@@ -728,6 +818,7 @@ export class CardContainer {
         determineButtonSchedule: (response: ReviewResponse) => RepItemScheduleInfo | null,
     ) {
         this.popClozeScope();
+        this.destroyClozeEditors();
         this.setCustomHotKeyState(settings.useCustomHotkeys);
         this.cardState = sessionData.cardData.currentCardState;
 
@@ -963,9 +1054,11 @@ export class CardContainer {
                 // Back into the answer field after Esc: the first cloze blank, the typed answer,
                 // or the free box
                 if (this.cardState !== CardState.Front) break;
-                const blank: HTMLInputElement | null =
-                    this.content.querySelector<HTMLInputElement>(".cloze-input");
-                const field = blank ?? this.typedInput ?? this.freeAnswer;
+                if (this.focusFirstBlank()) {
+                    consumeKeyEvent();
+                    break;
+                }
+                const field = this.typedInput ?? this.freeAnswer;
                 if (field === null) break;
                 field.focus();
                 consumeKeyEvent();
