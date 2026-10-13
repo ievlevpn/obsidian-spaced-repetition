@@ -705,7 +705,8 @@ export class CardContainer {
     private setUpClozeEditors(notePath: string): void {
         this.clozeInputs?.forEach((input) => {
             const wrap: HTMLSpanElement = createSpan({ cls: "sr-cloze-live" });
-            wrap.setCssProps({ width: `${Math.max(input.size, 3) + 2}ch` });
+            // At least as wide as the answer; grows with what is typed (CSS caps it at the line)
+            wrap.setCssProps({ "min-width": `${Math.max(input.size, 3) + 2}ch` });
             input.replaceWith(wrap);
             const editor = createEmbeddedMarkdownEditor(
                 this.app,
