@@ -91,7 +91,8 @@ by Stephen Mwangi (version 1.15.4). For what the plugin does and how to use it, 
   off, `N` write a note (answer side), `M` the card menu (arrow keys and Enter), `B` bury, `R`
   reset (asks; Enter confirms), `C` card info, `Backspace` back to the deck list, `?` the list of
   keys; besides Space/Enter, the digits, `S` skip, `U` undo, `I` important and `J` jump to the
-  note. Suspend and delete stay in the card menu. In the deck list: arrow keys move between decks
+  note. `Shift+S` suspends the card (a notice confirms it, and `U` brings it back); delete stays
+  in the card menu. In the deck list: arrow keys move between decks
   and open or close subdecks, Enter reviews, `M` (or the menu key) opens the deck's menu.
   In any answer field (a cloze blank, the typed answer, the note box) Esc only leaves the field, so
   the review keys work again (`S` to skip, ...); it never closes the review window. `Tab` (on the

@@ -905,6 +905,14 @@ export class CardContainer {
             consumeKeyEvent();
             return;
         }
+        // Shift+S suspends (U brings the card back)
+        if (e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey && e.code === "KeyS") {
+            if (this.markerActions === null) return;
+            if (this.cardState !== CardState.Front && this.cardState !== CardState.Back) return;
+            this.markerActions.suspend();
+            consumeKeyEvent();
+            return;
+        }
         // Keys with a modifier belong to Obsidian (Cmd+E, Ctrl+S, ...)
         if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
         const onCard: boolean =

@@ -29,6 +29,7 @@ export class ReviewKeysModal extends Modal {
                     ["U", t("KEYS_UNDO")],
                     ["I", t("KEYS_IMPORTANT")],
                     ["B", t("KEYS_BURY")],
+                    ["Shift+S", t("KEYS_SUSPEND")],
                     ["R", t("KEYS_RESET")],
                     ["C", t("KEYS_INFO")],
                     ["J", t("KEYS_JUMP")],
