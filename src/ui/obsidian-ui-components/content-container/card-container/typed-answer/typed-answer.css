@@ -301,7 +301,7 @@
     position: relative;
     display: inline-block;
     vertical-align: bottom;
-    min-width: 3ch;
+    width: auto;
     max-width: 100%;
     margin: 0 0.15em;
     border-bottom: 1px solid var(--background-modifier-border-hover);
@@ -333,18 +333,27 @@
             background: transparent;
         }
 
+        /* One line that grows to the right; past the line width it scrolls instead of wrapping
+           (a wrapping editor in a narrow blank broke a formula into a column of characters) */
         & .cm-scroller {
             padding: 0 0.3em;
-            overflow: hidden;
+            overflow-x: auto;
+            overflow-y: hidden;
+            scrollbar-width: none;
         }
 
         & .cm-content {
             min-height: 0;
             padding: 0;
+            width: max-content;
+            white-space: pre !important;
         }
 
         & .cm-line {
             padding: 0;
+            white-space: pre !important;
+            word-break: normal;
+            overflow-wrap: normal;
         }
 
         & .cm-sizer,
