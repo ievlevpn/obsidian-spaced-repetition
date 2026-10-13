@@ -40,6 +40,7 @@ const en: IBaseLocale = {
     KEYS_SHOW_OR_GOOD: "Show the answer, then rate Good",
     KEYS_RATE: "Rate the card (as shown on the buttons)",
     KEYS_EDIT: "Edit the card",
+    KEYS_FOCUS_ANSWER: "Back into the answer field (question side)",
     KEYS_TYPE: "Type answers on or off",
     KEYS_NOTE: "Write a note on the card (answer side)",
     KEYS_MENU: "Open the card menu (arrows, Enter)",

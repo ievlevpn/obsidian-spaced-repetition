@@ -951,6 +951,18 @@ export class CardContainer {
                 void this.backToDeckHandler();
                 consumeKeyEvent();
                 break;
+            case "Tab": {
+                // Back into the answer field after Esc: the first cloze blank, the typed answer,
+                // or the free box
+                if (this.cardState !== CardState.Front) break;
+                const blank: HTMLInputElement | null =
+                    this.content.querySelector<HTMLInputElement>(".cloze-input");
+                const field = blank ?? this.typedInput ?? this.freeAnswer;
+                if (field === null) break;
+                field.focus();
+                consumeKeyEvent();
+                break;
+            }
             case "KeyS":
                 this.skipCardHandler();
                 consumeKeyEvent();
