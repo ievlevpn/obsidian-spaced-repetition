@@ -1,6 +1,6 @@
 import "src/ui/obsidian-ui-components/content-container/card-container/card-container.css";
 import moment from "moment";
-import { App, Notice, Platform } from "obsidian";
+import { App, Notice, Platform, Scope } from "obsidian";
 
 import { CardType } from "src/data/data-structures/card/questions/question";
 import { CardFrontBackUtil } from "src/data/data-structures/card/questions/question-type";
@@ -71,6 +71,10 @@ export class CardContainer {
 
     private clozeInputs: NodeListOf<HTMLInputElement> | null = null;
     private clozeAnswers: NodeListOf<Element> | null = null;
+    // On Obsidian's keymap while a cloze blank has focus: Esc leaves the blank (and hands the
+    // review keys back) instead of reaching the review window, which it would close
+    private clozeScope: Scope;
+    private clozeScopePushed: boolean = false;
 
     // Typing the answer, switched on from the card menu for the current session. Cloze blanks
     // become fields; a card with a short plain-text answer gets a field under its question.
@@ -123,6 +127,14 @@ export class CardContainer {
         this.backToDeckHandler = backToDeckHandler;
         this.editCardHandler = editCardHandler;
         this.cardInfoHandler = displayCurrentCardInfoNoticeHandler;
+
+        this.clozeScope = new Scope(app.scope);
+        this.clozeScope.register([], "Escape", () => {
+            const focused: Element | null = activeDocument.activeElement;
+            if (focused instanceof HTMLElement && focused.hasClass("cloze-input")) focused.blur();
+            this.popClozeScope();
+            return false;
+        });
 
         // Build ui
         this.view = parentEl.createDiv();
@@ -289,6 +301,7 @@ export class CardContainer {
             this.pendingResumeTimeout = null;
         }
         this.cardState = CardState.Closed;
+        this.popClozeScope();
         activeDocument.removeEventListener("keydown", this._keydownHandler);
         this.view.addClass("sr-is-hidden");
     }
@@ -373,6 +386,7 @@ export class CardContainer {
     }
 
     public async drawCardFront(sessionData: SessionData, settings: SRSettings) {
+        this.popClozeScope();
         this.frontArgs = { sessionData, settings };
         this.toolbar.setResetButtonDisabled(true);
         // Update current deck info
@@ -625,10 +639,27 @@ export class CardContainer {
         );
     }
 
+    private pushClozeScope(): void {
+        if (this.clozeScopePushed) return;
+        this.app.keymap.pushScope(this.clozeScope);
+        this.clozeScopePushed = true;
+    }
+
+    private popClozeScope(): void {
+        if (!this.clozeScopePushed) return;
+        this.app.keymap.popScope(this.clozeScope);
+        this.clozeScopePushed = false;
+    }
+
     private _setupClozeInputListeners(): void {
         this.clozeInputs = activeDocument.querySelectorAll(".cloze-input");
 
         this.clozeInputs.forEach((input) => {
+            input.addEventListener("focus", () => this.pushClozeScope());
+            input.addEventListener("blur", (e: FocusEvent) => {
+                const next = e.relatedTarget as HTMLElement | null;
+                if (!next?.hasClass?.("cloze-input")) this.popClozeScope();
+            });
             input.addEventListener("keydown", (e: KeyboardEvent) => {
                 if (e.key === "Enter") {
                     e.preventDefault();
@@ -696,6 +727,7 @@ export class CardContainer {
         settings: SRSettings,
         determineButtonSchedule: (response: ReviewResponse) => RepItemScheduleInfo | null,
     ) {
+        this.popClozeScope();
         this.setCustomHotKeyState(settings.useCustomHotkeys);
         this.cardState = sessionData.cardData.currentCardState;
 
