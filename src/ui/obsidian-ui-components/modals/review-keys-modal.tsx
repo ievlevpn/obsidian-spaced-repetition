@@ -20,6 +20,7 @@ export class ReviewKeysModal extends Modal {
                 [
                     ["Space / Enter", t("KEYS_SHOW_OR_GOOD")],
                     ["0–4", t("KEYS_RATE")],
+                    ["Tab", t("KEYS_FOCUS_ANSWER")],
                     ["E", t("KEYS_EDIT")],
                     ["T", t("KEYS_TYPE")],
                     ["N", t("KEYS_NOTE")],

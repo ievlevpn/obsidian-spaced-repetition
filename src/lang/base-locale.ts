@@ -36,6 +36,7 @@ export interface IBaseLocale {
     KEYS_SHOW_OR_GOOD: string;
     KEYS_RATE: string;
     KEYS_EDIT: string;
+    KEYS_FOCUS_ANSWER: string;
     KEYS_TYPE: string;
     KEYS_NOTE: string;
     KEYS_MENU: string;
