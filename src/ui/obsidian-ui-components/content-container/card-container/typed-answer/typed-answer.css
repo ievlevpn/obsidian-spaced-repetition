@@ -295,3 +295,63 @@
 .sr-typed-other {
     color: var(--text-muted);
 }
+
+/* A cloze blank with live preview: an Obsidian editor inline in the text, in the blanks' look */
+.sr-card-container .sr-content .sr-cloze-live {
+    position: relative;
+    display: inline-block;
+    vertical-align: bottom;
+    min-width: 3ch;
+    max-width: 100%;
+    margin: 0 0.15em;
+    border-bottom: 1px solid var(--background-modifier-border-hover);
+    border-radius: var(--radius-s) var(--radius-s) 0 0;
+    background-color: var(--background-primary-alt);
+    color: var(--text-normal);
+    cursor: text;
+
+    &:focus-within {
+        border-bottom-color: var(--interactive-accent);
+        background-color: var(--background-secondary);
+        box-shadow: 0 1px 0 0 var(--interactive-accent);
+    }
+
+    /* The blank's own field, kept for the answer check and scrolling, out of sight */
+    & .sr-cloze-live-field {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        opacity: 0;
+        pointer-events: none;
+    }
+
+    & .markdown-source-view.mod-cm6 {
+        & .cm-editor,
+        & .cm-scroller {
+            font: inherit;
+            line-height: inherit;
+            background: transparent;
+        }
+
+        & .cm-scroller {
+            padding: 0 0.3em;
+            overflow: hidden;
+        }
+
+        & .cm-content {
+            min-height: 0;
+            padding: 0;
+        }
+
+        & .cm-line {
+            padding: 0;
+        }
+
+        & .cm-sizer,
+        & .cm-contentContainer {
+            max-width: none;
+            margin: 0;
+            padding: 0;
+        }
+    }
+}

@@ -428,6 +428,9 @@ const en: IBaseLocale = {
     TYPED_LAYOUT_ABOVE: "Above the answer",
     TYPED_LAYOUT_LEFT: "Left of the answer",
     TYPED_LAYOUT_RIGHT: "Right of the answer",
+    CLOZE_LIVE_PREVIEW: "Live preview in cloze blanks",
+    CLOZE_LIVE_PREVIEW_DESC:
+        "Type into each cloze blank with an Obsidian editor: math renders as you type, and latex-suite works. Desktop only; heavier on cards with many blanks.",
     NOTES_REVIEW_QUEUE: "Notes Review Queue",
     CLOSE: "Close",
     NEW: "New",

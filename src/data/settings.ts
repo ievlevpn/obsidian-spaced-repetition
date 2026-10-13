@@ -91,6 +91,8 @@ export interface SRSettings {
     answerKeys: AnswerKeys;
     // Where a free typed answer is shown, relative to the true answer
     typedAnswerLayout: TypedAnswerLayout;
+    // An Obsidian editor (live preview) in each cloze blank, on desktop
+    clozeLivePreview: boolean;
     // The thin progress line under the card toolbar
     showProgressBar: boolean;
     useCalloutsForSchedulingComments: boolean;
@@ -194,6 +196,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     useCustomHotkeys: false,
     answerKeys: "original",
     typedAnswerLayout: "below",
+    clozeLivePreview: false,
     showProgressBar: true,
     useCalloutsForSchedulingComments: false,
 
