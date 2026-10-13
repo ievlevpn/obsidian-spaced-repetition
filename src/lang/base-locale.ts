@@ -44,6 +44,7 @@ export interface IBaseLocale {
     KEYS_UNDO: string;
     KEYS_IMPORTANT: string;
     KEYS_BURY: string;
+    KEYS_SUSPEND: string;
     KEYS_RESET: string;
     KEYS_INFO: string;
     KEYS_JUMP: string;

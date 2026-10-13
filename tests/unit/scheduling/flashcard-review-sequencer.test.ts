@@ -2405,3 +2405,31 @@ describe("buryCurrentCard", () => {
         expect(c.questionPostponementList.includes(buried)).toBe(false);
     });
 });
+
+describe("suspendCurrentCard", () => {
+    test("suspends the card in the note; undo brings it back and clears the marker", async () => {
+        const text = `#flashcards Q1::A1 <!--SR:!2023-09-02,4,270-->
+#flashcards Q2::A2 <!--SR:!2023-09-02,5,270-->`;
+        const c: TestContext = TestContext.Create(
+            orderDueFirstSequential,
+            FlashcardReviewMode.Review,
+            { ...DEFAULT_SETTINGS, cardCommentOnSameLine: true },
+            text,
+        );
+        await c.setSequencerDeckTreeFromOriginalText();
+        const total = () => c.reviewSequencer.getDeckStats(TopicPath.emptyPath).totalCount;
+        expect(total()).toEqual(2);
+
+        await c.reviewSequencer.suspendCurrentCard();
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q2");
+        expect(c.file.content).toContain("susp");
+        expect(total()).toEqual(1);
+        expect(c.reviewSequencer.canUndo).toBe(true);
+
+        expect(await c.reviewSequencer.undo()).toBe(true);
+        expect(c.reviewSequencer.currentCard.front).toEqual("Q1");
+        expect(c.reviewSequencer.currentCard.markers.suspended).toBe(false);
+        expect(c.file.content).toEqual(text);
+        expect(total()).toEqual(2);
+    });
+});

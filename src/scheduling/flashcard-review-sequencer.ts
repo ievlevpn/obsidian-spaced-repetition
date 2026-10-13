@@ -132,6 +132,24 @@ interface UndoEntry {
     pendingCards: PendingCard[];
     histogram: Map<number, number>;
     postponementList: string[];
+    // A suspend: undo clears the marker in the note and puts the card back in the full deck tree
+    unsuspend?: boolean;
+    originalDeckItems?: UndoEntry["deckItems"];
+}
+
+// The new and due lists of a deck and all its subdecks, to put back on undo
+function snapshotDeckItems(root: Deck): UndoEntry["deckItems"] {
+    const items: UndoEntry["deckItems"] = [];
+    const collect = (deck: Deck) => {
+        items.push({
+            deck,
+            newRepItems: [...deck.newRepItems],
+            dueRepItems: [...deck.dueRepItems],
+        });
+        deck.subdecks.forEach(collect);
+    };
+    collect(root);
+    return items;
 }
 
 // How many actions can be undone in a row
@@ -344,15 +362,19 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
 
     /**
      * Suspends the current card: written to the note, so it is left out of every review until
-     * unsuspended, and taken out of this session, which moves on to the next card.
+     * unsuspended, and taken out of this session, which moves on to the next card. Undo brings it
+     * back and clears the marker.
      */
     async suspendCurrentCard(): Promise<void> {
         const card: Card | null = this.currentCard;
         if (card === null) return;
+        const entry: UndoEntry | null = this.pushUndo();
+        if (entry) {
+            entry.unsuspend = true;
+            entry.originalDeckItems = snapshotDeckItems(this._originalDeckTree);
+        }
         card.markers.suspended = true;
         await DataStore.getInstance().writeSchedule(this.currentQuestion);
-        // Undoing an earlier answer would put the deck lists back with this card in them
-        this.undoStack = [];
         this._originalDeckTree.deleteCardFromAllDecks(card, false);
         this.cardSequencer.deleteCurrentRepItemFromAllDecks();
     }
@@ -389,6 +411,14 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
             entry.card.scheduleInfo = entry.scheduleInfo;
             await DataStore.getInstance().writeSchedule(entry.card.question);
         }
+        if (entry.unsuspend) {
+            entry.card.markers.suspended = false;
+            await DataStore.getInstance().writeSchedule(entry.card.question);
+            for (const { deck, newRepItems, dueRepItems } of entry.originalDeckItems ?? []) {
+                deck.newRepItems = [...newRepItems];
+                deck.dueRepItems = [...dueRepItems];
+            }
+        }
         const postponementChanged: boolean =
             entry.postponementList.join("\n") !==
             this.questionPostponementList.snapshot().join("\n");
@@ -415,16 +445,7 @@ export class FlashcardReviewSequencer implements IFlashcardReviewSequencer {
     private pushUndo(): UndoEntry | null {
         const card: Card | null = this.currentCard;
         if (!card || !this.remainingDeckTree) return null;
-        const deckItems: UndoEntry["deckItems"] = [];
-        const collect = (deck: Deck) => {
-            deckItems.push({
-                deck,
-                newRepItems: [...deck.newRepItems],
-                dueRepItems: [...deck.dueRepItems],
-            });
-            deck.subdecks.forEach(collect);
-        };
-        collect(this.remainingDeckTree);
+        const deckItems: UndoEntry["deckItems"] = snapshotDeckItems(this.remainingDeckTree);
         const entry: UndoEntry = {
             card,
             scheduleInfo: card.scheduleInfo,
