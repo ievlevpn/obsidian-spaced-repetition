@@ -230,6 +230,10 @@
 .sr-card-container .sr-content .cloze-input {
     height: auto;
     min-width: 2.5em;
+    /* Sized to the answer (its size attribute), but never wider than the line: a sentence-long
+       answer would otherwise overflow the card and scroll it sideways */
+    max-width: 100%;
+    box-sizing: border-box;
     margin: 0 0.15em;
     padding: 0 0.3em;
     border: none;
