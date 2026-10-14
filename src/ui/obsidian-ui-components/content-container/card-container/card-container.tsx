@@ -41,6 +41,7 @@ import {
 } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import { ConfirmationModal } from "src/ui/obsidian-ui-components/modals/confirmation-modal";
 import { ReviewKeysModal } from "src/ui/obsidian-ui-components/modals/review-keys-modal";
+import { cardCommentRefInQuote } from "src/utils/card-comment";
 import { attachEdgeSwipe, Point } from "src/utils/edge-swipe";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { attachPullDown } from "src/utils/pull-down";
@@ -922,21 +923,12 @@ export class CardContainer {
             this.scrollToAskedCloze();
         }
 
-        // The comment box is suppressed for any card that contains a ">" line anywhere.
-        //
-        // This is DELIBERATELY wider than "the card is hosted inside a blockquote": it also
-        // catches a card whose answer merely quotes something, or contains a "> [!note]"
-        // callout. Measured on a 4263-card vault, that is 17 cards (0.4%), silently. The wide
-        // test is the ruling, not an oversight: an earlier attempt checked only the first
-        // line and missed the common case of a card whose quote starts further down, which is
-        // the shape that actually occurs. A reference emitted inside a quoted region renders,
-        // but the definition it points at necessarily lands at the end of the note, outside
-        // the quote, so the pair reads as part of a quote the user did not write. Refusing the
-        // box is the conservative choice. Recorded in the design doc's limitations.
-        const cardText: string = sessionData.currentQuestion.questionText.original;
-        const hostedInBlockquote: boolean = cardText
-            .split("\n")
-            .some((line) => line.trimStart().startsWith(">"));
+        // No comment box for a card whose reference would land in a quote (see
+        // cardCommentRefInQuote). Until 2026-10-14 any ">" line in the card suppressed the box,
+        // which also hid it on cards that merely quote a theorem above an unquoted last line.
+        const hostedInBlockquote: boolean = cardCommentRefInQuote(
+            sessionData.currentQuestion.questionText.original,
+        );
         if (reviewMode !== FlashcardReviewMode.Cram && !hostedInBlockquote) {
             await this.cardComment.show(
                 sessionData.currentQuestion.cardCommentDefinition,

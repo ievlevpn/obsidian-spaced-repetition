@@ -243,3 +243,19 @@ export function clampNotesHeight(height: number, windowHeight: number): number {
     const max: number = Math.max(NOTES_MIN_HEIGHT, windowHeight * NOTES_MAX_FRACTION);
     return Math.round(Math.min(max, Math.max(NOTES_MIN_HEIGHT, height)));
 }
+
+/**
+ * Whether a card's comment reference would land inside a quote or callout. The reference goes
+ * at the end of the card's last line, before its schedule comment, while the definition goes at
+ * the end of the note, outside any quote; a reference on a quoted line would read as part of a
+ * quote the user did not write. So only the last line counts: a card that quotes a theorem
+ * above an unquoted line is fine. (When the schedule goes on a line of its own, a quoted last
+ * line would be fine too; refusing it is the conservative choice.)
+ *
+ * @param cardText - The card's text as written in the note
+ * @returns True when the comment box should be refused
+ */
+export function cardCommentRefInQuote(cardText: string): boolean {
+    const lines: string[] = cardText.trimEnd().split("\n");
+    return lines[lines.length - 1].trimStart().startsWith(">");
+}
