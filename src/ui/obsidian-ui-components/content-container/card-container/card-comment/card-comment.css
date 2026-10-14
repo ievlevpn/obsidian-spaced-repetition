@@ -17,22 +17,66 @@
 }
 
 /* Past notes: a quiet panel, date in its own column */
-.sr-card-comment-past {
-    display: flex;
-    flex-direction: column;
-    gap: var(--size-4-1);
+.sr-card-comment-past-panel {
     font-size: var(--font-ui-small);
     color: var(--text-muted);
     background-color: var(--background-secondary);
     border-radius: var(--radius-m);
-    padding: var(--size-4-2) var(--size-4-3);
+    padding: var(--size-4-1) var(--size-4-3);
 
-    &:empty {
+    &:has(> .sr-card-comment-past:empty) {
         display: none;
     }
 }
 
+.sr-card-comment-past {
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-4-1);
+    padding: var(--size-4-1) 0;
+    /* Height-capped so a long history never crowds out the card; it scrolls inside, and a
+       scroll that reaches its end does not carry on into the card */
+    --sr-notes-max: min(13rem, 28vh);
+    max-height: var(--sr-notes-max);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    /* Fades at the edges with more notes beyond (has-more-above / has-more-below, set on scroll) */
+    --sr-fade-top: 0px;
+    --sr-fade-bottom: 0px;
+    mask-image: linear-gradient(
+        to bottom,
+        transparent 0,
+        #000 var(--sr-fade-top),
+        #000 calc(100% - var(--sr-fade-bottom)),
+        transparent 100%
+    );
+
+    &.has-more-above {
+        --sr-fade-top: 1.5rem;
+    }
+
+    &.has-more-below {
+        --sr-fade-bottom: 1.5rem;
+    }
+
+    /* Expanded ("show N earlier notes", "expand"): every note, and room to read them */
+    &.is-expanded {
+        --sr-notes-max: min(28rem, 50vh);
+    }
+}
+
+/* A phone has little height to spare: the card and the rating buttons come first */
+.is-phone .sr-card-comment-past {
+    --sr-notes-max: min(8rem, 20vh);
+
+    &.is-expanded {
+        --sr-notes-max: 45vh;
+    }
+}
+
 .sr-card-comment-entry {
+    /* Rows keep their height in the capped list; the list scrolls instead */
+    flex-shrink: 0;
     display: flex;
     gap: var(--size-4-3);
     align-items: baseline;
