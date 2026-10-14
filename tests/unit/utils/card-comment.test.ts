@@ -1,4 +1,5 @@
 import {
+    cardCommentRefInQuote,
     appendCardCommentEntry,
     CardCommentEntry,
     editCardCommentEntry,
@@ -250,5 +251,22 @@ describe("editCardCommentEntry", () => {
         expect(editCardCommentEntry(def, "sr-a3f91c", 0, "line 1\nline 2")).toBe(
             "[^sr-a3f91c]: - *2026-01-01:* line 1\n      line 2\n    - *2026-01-02:* second",
         );
+    });
+});
+
+describe("cardCommentRefInQuote", () => {
+    test("a card without quotes", () => {
+        expect(cardCommentRefInQuote("Q ::: A")).toBe(false);
+    });
+
+    test("a quote above an unquoted last line is fine", () => {
+        const card = "> **Theorem:** $X$\n> more\n\nKernel = {{functions vanishing at $x$}}.";
+        expect(cardCommentRefInQuote(card)).toBe(false);
+    });
+
+    test("a card ending inside a quote or callout is refused", () => {
+        expect(cardCommentRefInQuote("Q\n> quoted {{answer}}")).toBe(true);
+        expect(cardCommentRefInQuote("> [!note]\n> {{answer}}\n")).toBe(true);
+        expect(cardCommentRefInQuote("  > indented quote {{a}}")).toBe(true);
     });
 });
