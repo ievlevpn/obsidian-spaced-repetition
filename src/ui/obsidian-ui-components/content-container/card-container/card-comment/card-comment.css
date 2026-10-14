@@ -18,28 +18,81 @@
 
 /* Past notes: a quiet panel, date in its own column */
 .sr-card-comment-past-panel {
+    position: relative;
     font-size: var(--font-ui-small);
     color: var(--text-muted);
     background-color: var(--background-secondary);
     border-radius: var(--radius-m);
-    padding: var(--size-4-1) var(--size-4-3);
+    padding: var(--size-4-2) var(--size-4-3) var(--size-4-1);
 
     &:has(> .sr-card-comment-past:empty) {
         display: none;
     }
 }
 
+/* The resize grip: a small pill centred on the panel's top edge; drag it up for a taller list */
+.sr-card-comment-grip {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 48px;
+    height: 12px;
+    cursor: ns-resize;
+    touch-action: none;
+
+    &::after {
+        content: "";
+        position: absolute;
+        top: 4px;
+        left: 12px;
+        right: 12px;
+        height: 3px;
+        border-radius: 2px;
+        background-color: var(--background-modifier-border);
+        transition: background-color 120ms ease-out;
+    }
+
+    &:hover::after,
+    .is-resizing > &::after {
+        background-color: var(--text-faint);
+    }
+}
+
+/* A finger needs a larger target */
+.is-mobile .sr-card-comment-grip {
+    width: 72px;
+    height: 20px;
+    top: -6px;
+
+    &::after {
+        top: 10px;
+        left: 20px;
+        right: 20px;
+        background-color: var(--text-faint);
+    }
+}
+
 .sr-card-comment-past {
+    box-sizing: border-box;
     display: flex;
     flex-direction: column;
     gap: var(--size-4-1);
-    padding: var(--size-4-1) 0;
-    /* Height-capped so a long history never crowds out the card; it scrolls inside, and a
-       scroll that reaches its end does not carry on into the card */
+    /* Room below the last note for math hanging below its line */
+    padding: var(--size-4-1) 0 var(--size-4-2);
+    /* Height-capped so a long history never crowds out the card. The cap is the grip's height
+       when one is set (an inline --sr-notes-max), else the default below. It scrolls inside only
+       when the notes overflow (is-scrollable), and a scroll that reaches its end does not carry
+       on into the card. */
     --sr-notes-max: min(13rem, 28vh);
     max-height: var(--sr-notes-max);
-    overflow-y: auto;
+    overflow-y: hidden;
     overscroll-behavior: contain;
+
+    &.is-scrollable {
+        overflow-y: auto;
+    }
+
     /* Fades at the edges with more notes beyond (has-more-above / has-more-below, set on scroll) */
     --sr-fade-top: 0px;
     --sr-fade-bottom: 0px;
@@ -58,20 +111,11 @@
     &.has-more-below {
         --sr-fade-bottom: 1.5rem;
     }
-
-    /* Expanded ("show N earlier notes", "expand"): every note, and room to read them */
-    &.is-expanded {
-        --sr-notes-max: min(28rem, 50vh);
-    }
 }
 
 /* A phone has little height to spare: the card and the rating buttons come first */
 .is-phone .sr-card-comment-past {
     --sr-notes-max: min(8rem, 20vh);
-
-    &.is-expanded {
-        --sr-notes-max: 45vh;
-    }
 }
 
 .sr-card-comment-entry {

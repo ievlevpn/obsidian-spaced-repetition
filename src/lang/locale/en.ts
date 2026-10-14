@@ -116,7 +116,7 @@ const en: IBaseLocale = {
     CARD_NOTE_SHOW_EARLIER: "show ${count} earlier notes",
     CARD_NOTE_SHOW_EARLIER_ONE: "show 1 earlier note",
     CARD_NOTE_SHOW_FEWER: "show fewer",
-    CARD_NOTE_EXPAND: "expand",
+    CARD_NOTE_RESIZE: "Drag to resize; double-click to reset",
     CARD_NOTE_EDITING: "Editing note from",
     CARD_NOTE_EDITING_UNDATED: "Editing note",
     EDIT_CARD: "Edit Card",

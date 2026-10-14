@@ -9,6 +9,7 @@ import {
 } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import {
     CardCommentEntry,
+    clampNotesHeight,
     notesLinkLabel,
     parseCardCommentDefinition,
 } from "src/utils/card-comment";
@@ -25,6 +26,10 @@ export interface CardCommentInput {
 
 // Per-device memory of whether the note box is shown (app.loadLocalStorage)
 const BOX_OPEN_KEY = "sr-card-comment-box-open";
+// Per-device height of the past notes list, set by dragging its grip (px; absent: the default)
+const NOTES_HEIGHT_KEY = "sr-card-comment-notes-height";
+// Overflow smaller than this is not scrolling: math hanging a few px below its line
+const OVERFLOW_SLACK = 6;
 // Past notes shown before "show N earlier notes"
 const VISIBLE_NOTES = 3;
 
@@ -53,7 +58,7 @@ export default class CardCommentComponent {
     private saveScope: Scope;
     private saveScopePushed: boolean = false;
     private saveLink: HTMLAnchorElement;
-    // "show N earlier notes" / "expand" / "show fewer": see notesLinkLabel
+    // "show N earlier notes" / "show fewer": see notesLinkLabel
     private moreLink: HTMLAnchorElement;
     private showAllNotes: boolean = false;
 
@@ -81,6 +86,7 @@ export default class CardCommentComponent {
         // the notes and not the panel
         const pastPanel = this.container.createDiv();
         pastPanel.addClass("sr-card-comment-past-panel");
+        this.createResizeGrip(pastPanel);
         this.pastEntries = pastPanel.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
         this.pastEntries.addEventListener("scroll", () => this.updateScrollFades(), {
@@ -138,6 +144,8 @@ export default class CardCommentComponent {
             if (!this.inputEl.contains(e.relatedTarget as Node | null)) this.popSaveScope();
         });
         this.setOpen(this.app.loadLocalStorage(BOX_OPEN_KEY) !== false, false);
+        const savedHeight: unknown = this.app.loadLocalStorage(NOTES_HEIGHT_KEY);
+        if (typeof savedHeight === "number") this.setNotesHeight(savedHeight);
     }
 
     private createTextarea(): HTMLTextAreaElement {
@@ -278,19 +286,58 @@ export default class CardCommentComponent {
         const rows: HTMLElement[] = Array.from(this.pastEntries.children) as HTMLElement[];
         const hidden: number = Math.max(0, rows.length - VISIBLE_NOTES);
         rows.forEach((row, i) => row.toggleClass("sr-is-hidden", !this.showAllNotes && i < hidden));
-        this.pastEntries.toggleClass("is-expanded", this.showAllNotes);
-        const label: string | null = notesLinkLabel(
-            hidden,
-            this.isOverflowing(),
-            this.showAllNotes,
-        );
+        const label: string | null = notesLinkLabel(hidden, this.showAllNotes);
         this.moreLink.toggleClass("sr-is-hidden", label === null);
         if (label !== null) this.moreLink.setText(label);
         this.updateScrollFades();
     }
 
-    private isOverflowing(): boolean {
-        return this.pastEntries.scrollHeight > this.pastEntries.clientHeight + 1;
+    /**
+     * A grip on the panel's top edge: dragging it up makes the list taller, down shorter. The
+     * height is a cap, so a card with few notes still takes only their room. Remembered per
+     * device; a double click goes back to the default.
+     */
+    private createResizeGrip(panel: HTMLElement): void {
+        const grip: HTMLDivElement = panel.createDiv();
+        grip.addClass("sr-card-comment-grip");
+        grip.ariaLabel = t("CARD_NOTE_RESIZE");
+        let startY: number = 0;
+        let startHeight: number = 0;
+        let height: number | null = null;
+        grip.addEventListener("pointerdown", (e: PointerEvent) => {
+            e.preventDefault();
+            grip.setPointerCapture(e.pointerId);
+            startY = e.clientY;
+            startHeight = this.pastEntries.offsetHeight;
+            height = null;
+            panel.addClass("is-resizing");
+        });
+        grip.addEventListener("pointermove", (e: PointerEvent) => {
+            if (!grip.hasPointerCapture(e.pointerId)) return;
+            height = this.setNotesHeight(startHeight - (e.clientY - startY));
+        });
+        const end = (e: PointerEvent) => {
+            if (!grip.hasPointerCapture(e.pointerId)) return;
+            grip.releasePointerCapture(e.pointerId);
+            panel.removeClass("is-resizing");
+            if (height !== null) this.app.saveLocalStorage(NOTES_HEIGHT_KEY, height);
+        };
+        grip.addEventListener("pointerup", end);
+        grip.addEventListener("pointercancel", end);
+        grip.addEventListener("dblclick", () => {
+            this.pastEntries.style.removeProperty("--sr-notes-max");
+            this.app.saveLocalStorage(NOTES_HEIGHT_KEY, null);
+            this.updateScrollFades();
+        });
+    }
+
+    /** Caps the list at `height` px (kept within bounds); returns the height applied. */
+    private setNotesHeight(height: number): number {
+        const win: Window = this.pastEntries.win ?? window;
+        const applied: number = clampNotesHeight(height, win.innerHeight);
+        this.pastEntries.setCssProps({ "--sr-notes-max": `${applied}px` });
+        this.updateScrollFades();
+        return applied;
     }
 
     /**
@@ -306,13 +353,16 @@ export default class CardCommentComponent {
         this.updateScrollFades();
     }
 
-    // Soft fades at the edges that have more notes beyond them
+    // Scrolls only when the notes are taller than the cap, with soft fades at the edges that
+    // have more notes beyond them
     private updateScrollFades(): void {
         const list: HTMLDivElement = this.pastEntries;
-        list.toggleClass("has-more-above", list.scrollTop > 1);
+        const overflow: number = list.scrollHeight - list.clientHeight;
+        list.toggleClass("is-scrollable", overflow > OVERFLOW_SLACK);
+        list.toggleClass("has-more-above", overflow > OVERFLOW_SLACK && list.scrollTop > 1);
         list.toggleClass(
             "has-more-below",
-            list.scrollTop + list.clientHeight < list.scrollHeight - 1,
+            overflow > OVERFLOW_SLACK && list.scrollTop < overflow - OVERFLOW_SLACK,
         );
     }
 
