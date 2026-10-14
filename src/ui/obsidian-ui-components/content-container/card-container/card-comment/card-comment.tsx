@@ -7,7 +7,11 @@ import {
     createEmbeddedMarkdownEditor,
     EmbeddedMarkdownEditor,
 } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
-import { CardCommentEntry, parseCardCommentDefinition } from "src/utils/card-comment";
+import {
+    CardCommentEntry,
+    notesLinkLabel,
+    parseCardCommentDefinition,
+} from "src/utils/card-comment";
 import EmulatedPlatform from "src/utils/platform-detector";
 import { RenderMarkdownWrapper } from "src/utils/renderers";
 import { TextDirection } from "src/utils/strings";
@@ -49,7 +53,7 @@ export default class CardCommentComponent {
     private saveScope: Scope;
     private saveScopePushed: boolean = false;
     private saveLink: HTMLAnchorElement;
-    // "show N earlier notes" / "show fewer", only when there are more than VISIBLE_NOTES
+    // "show N earlier notes" / "expand" / "show fewer": see notesLinkLabel
     private moreLink: HTMLAnchorElement;
     private showAllNotes: boolean = false;
 
@@ -70,12 +74,18 @@ export default class CardCommentComponent {
         this.moreLink.addClasses(["sr-card-comment-more", "sr-is-hidden"]);
         this.moreLink.addEventListener("click", (e: MouseEvent) => {
             e.preventDefault();
-            this.showAllNotes = !this.showAllNotes;
-            this.updateVisibleNotes();
+            this.setExpanded(!this.showAllNotes);
         });
 
-        this.pastEntries = this.container.createDiv();
+        // The panel draws the background; the list inside it scrolls, so the edge fades fade
+        // the notes and not the panel
+        const pastPanel = this.container.createDiv();
+        pastPanel.addClass("sr-card-comment-past-panel");
+        this.pastEntries = pastPanel.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
+        this.pastEntries.addEventListener("scroll", () => this.updateScrollFades(), {
+            passive: true,
+        });
 
         // A quiet line between the past notes and the box: "Editing note from …" on the left,
         // the toggle that hides or shows the box on the right
@@ -243,9 +253,12 @@ export default class CardCommentComponent {
                 this.startEditing(index);
             });
         }
-        this.updateVisibleNotes();
-
         this.container.removeClass("sr-is-hidden");
+        // Measured once laid out: whether the latest notes overflow the cap, and the newest
+        // note in view at the bottom
+        this.updateVisibleNotes();
+        this.pastEntries.scrollTop = this.pastEntries.scrollHeight;
+        this.updateScrollFades();
     }
 
     /** Opens the box if collapsed, without remembering that, and puts the cursor in it (N key). */
@@ -265,13 +278,41 @@ export default class CardCommentComponent {
         const rows: HTMLElement[] = Array.from(this.pastEntries.children) as HTMLElement[];
         const hidden: number = Math.max(0, rows.length - VISIBLE_NOTES);
         rows.forEach((row, i) => row.toggleClass("sr-is-hidden", !this.showAllNotes && i < hidden));
-        this.moreLink.toggleClass("sr-is-hidden", hidden === 0);
-        this.moreLink.setText(
-            this.showAllNotes
-                ? t("CARD_NOTE_SHOW_FEWER")
-                : hidden === 1
-                  ? t("CARD_NOTE_SHOW_EARLIER_ONE")
-                  : t("CARD_NOTE_SHOW_EARLIER", { count: hidden }),
+        this.pastEntries.toggleClass("is-expanded", this.showAllNotes);
+        const label: string | null = notesLinkLabel(
+            hidden,
+            this.isOverflowing(),
+            this.showAllNotes,
+        );
+        this.moreLink.toggleClass("sr-is-hidden", label === null);
+        if (label !== null) this.moreLink.setText(label);
+        this.updateScrollFades();
+    }
+
+    private isOverflowing(): boolean {
+        return this.pastEntries.scrollHeight > this.pastEntries.clientHeight + 1;
+    }
+
+    /**
+     * Expands or collapses the list, keeping the notes in view where they are: expanding grows
+     * the list upwards, revealing the earlier notes above them, like loading a chat's history.
+     */
+    private setExpanded(expanded: boolean): void {
+        const list: HTMLDivElement = this.pastEntries;
+        const fromBottom: number = list.scrollHeight - list.scrollTop;
+        this.showAllNotes = expanded;
+        this.updateVisibleNotes();
+        list.scrollTop = expanded ? list.scrollHeight - fromBottom : list.scrollHeight;
+        this.updateScrollFades();
+    }
+
+    // Soft fades at the edges that have more notes beyond them
+    private updateScrollFades(): void {
+        const list: HTMLDivElement = this.pastEntries;
+        list.toggleClass("has-more-above", list.scrollTop > 1);
+        list.toggleClass(
+            "has-more-below",
+            list.scrollTop + list.clientHeight < list.scrollHeight - 1,
         );
     }
 
@@ -314,7 +355,9 @@ export default class CardCommentComponent {
             this.setInput("");
         });
         this.editingLine.removeClass("sr-is-hidden");
-        this.pastEntries.children[index]?.addClass("is-being-edited");
+        const row: Element | undefined = this.pastEntries.children[index];
+        row?.addClass("is-being-edited");
+        row?.scrollIntoView({ block: "nearest" });
 
         if (this.editor) this.editor.focus();
         else this.textarea?.focus();

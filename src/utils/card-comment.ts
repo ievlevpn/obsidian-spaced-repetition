@@ -1,3 +1,4 @@
+import { t } from "src/lang/helpers";
 export interface CardCommentEntry {
     date: string;
     text: string;
@@ -210,4 +211,25 @@ export function generateCardCommentLabel(taken: Set<string>): string {
         const label = REF_PREFIX + hex;
         if (!taken.has(label)) return label;
     }
+}
+
+/**
+ * What the link above the past notes offers. The list is height-capped (CSS) and scrolls inside;
+ * expanding shows every note and raises the cap, so it is also offered when the latest notes
+ * alone overflow the cap.
+ *
+ * @param hidden - Notes folded away behind "show N earlier notes"
+ * @param overflowing - Whether the collapsed list is taller than its cap
+ * @param expanded - Whether the list is expanded
+ * @returns The link's label, or null for no link
+ */
+export function notesLinkLabel(
+    hidden: number,
+    overflowing: boolean,
+    expanded: boolean,
+): string | null {
+    if (expanded) return t("CARD_NOTE_SHOW_FEWER");
+    if (hidden === 1) return t("CARD_NOTE_SHOW_EARLIER_ONE");
+    if (hidden > 1) return t("CARD_NOTE_SHOW_EARLIER", { count: hidden });
+    return overflowing ? t("CARD_NOTE_EXPAND") : null;
 }
