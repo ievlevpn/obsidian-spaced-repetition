@@ -6,10 +6,21 @@
     margin-top: var(--size-4-2);
     padding: var(--size-4-3) var(--internal-side-padding) var(--size-4-2);
     border-top: 1px solid var(--background-modifier-border);
-    /* A column-flex sibling of the scrolling content: never let it be compressed away when
-       vertical space is tight, which is the common case on a phone. */
-    flex-shrink: 0;
+    /* A column-flex sibling of the card, both at their natural height. When they do not fit, the
+       pane gives way first (its list of notes scrolls), down to a min-height set by the code:
+       about two and a half lines of notes plus the box. Only then does the card scroll. */
+    flex: 0 1000 auto;
     width: 100%;
+
+    /* Only the list gives way; the links, the bar and the box keep their height */
+    & > * {
+        flex-shrink: 0;
+    }
+
+    & > .sr-card-comment-past-panel {
+        flex-shrink: 1;
+        min-height: 0;
+    }
 }
 
 .sr-card-comment.sr-is-hidden {
@@ -24,52 +35,11 @@
     background-color: var(--background-secondary);
     border-radius: var(--radius-m);
     padding: var(--size-4-2) var(--size-4-3) var(--size-4-1);
+    display: flex;
+    flex-direction: column;
 
     &:has(> .sr-card-comment-past:empty) {
         display: none;
-    }
-}
-
-/* The resize grip: a small pill centred on the panel's top edge; drag it up for a taller list */
-.sr-card-comment-grip {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 48px;
-    height: 12px;
-    cursor: ns-resize;
-    touch-action: none;
-
-    &::after {
-        content: "";
-        position: absolute;
-        top: 4px;
-        left: 12px;
-        right: 12px;
-        height: 3px;
-        border-radius: 2px;
-        background-color: var(--background-modifier-border);
-        transition: background-color 120ms ease-out;
-    }
-
-    &:hover::after,
-    .is-resizing > &::after {
-        background-color: var(--text-faint);
-    }
-}
-
-/* A finger needs a larger target */
-.is-mobile .sr-card-comment-grip {
-    width: 72px;
-    height: 20px;
-    top: -6px;
-
-    &::after {
-        top: 10px;
-        left: 20px;
-        right: 20px;
-        background-color: var(--text-faint);
     }
 }
 
@@ -80,12 +50,12 @@
     gap: var(--size-4-1);
     /* Room below the last note for math hanging below its line */
     padding: var(--size-4-1) 0 var(--size-4-2);
-    /* Height-capped so a long history never crowds out the card. The cap is the grip's height
-       when one is set (an inline --sr-notes-max), else the default below. It scrolls inside only
-       when the notes overflow (is-scrollable), and a scroll that reaches its end does not carry
-       on into the card. */
-    --sr-notes-max: min(13rem, 28vh);
-    max-height: var(--sr-notes-max);
+    /* As tall as its notes when the card leaves the room, never more than half the window. It
+       scrolls inside only when the notes overflow (is-scrollable), and a scroll that reaches its
+       end does not carry on into the card. */
+    flex: 0 1 auto;
+    min-height: 0;
+    max-height: 50vh;
     overflow-y: hidden;
     overscroll-behavior: contain;
 
@@ -104,18 +74,14 @@
         transparent 100%
     );
 
+    /* Never more than a fifth of the list each, so a short list is not faded away */
     &.has-more-above {
-        --sr-fade-top: 1.5rem;
+        --sr-fade-top: min(1.5rem, 20%);
     }
 
     &.has-more-below {
-        --sr-fade-bottom: 1.5rem;
+        --sr-fade-bottom: min(1.5rem, 20%);
     }
-}
-
-/* A phone has little height to spare: the card and the rating buttons come first */
-.is-phone .sr-card-comment-past {
-    --sr-notes-max: min(8rem, 20vh);
 }
 
 .sr-card-comment-entry {
@@ -245,6 +211,19 @@
 
 .sr-card-comment-text > p {
     margin: 0;
+}
+
+/* Long notes cut to two lines (a setting); a tap opens one */
+.sr-card-comment.is-clamping .sr-card-comment-text:not(.is-open) {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+}
+
+.sr-card-comment-text.is-clamped,
+.sr-card-comment-text.is-open {
+    cursor: pointer;
 }
 
 .sr-card-comment-input {

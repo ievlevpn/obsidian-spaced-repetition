@@ -66,6 +66,8 @@ export interface SRSettings {
     initiallyExpandAllSubdecksInTree: boolean;
     showContextInCards: boolean;
     showIntervalInReviewButtons: boolean;
+    // Past card notes in a review: long ones show two lines until tapped
+    clampLongCardNotes: boolean;
     flashcardHeightPercentage: number;
     flashcardWidthPercentage: number;
     flashcardHeightPercentageMobile: number;
@@ -177,6 +179,7 @@ export const DEFAULT_SETTINGS: SRSettings = {
     initiallyExpandAllSubdecksInTree: true,
     showContextInCards: true,
     showIntervalInReviewButtons: true,
+    clampLongCardNotes: true,
     flashcardHeightPercentage: 60,
     flashcardWidthPercentage: 60,
     flashcardHeightPercentageMobile: 100,

@@ -4,10 +4,11 @@
     --internal-side-padding: var(--size-4-2);
 
     & .sr-scroll-wrapper {
-        height: 100px;
-        /* Arbitrary height to force the content to scroll */
+        /* The card's natural height, filling any room left over; when the card and the notes
+           pane under it do not fit, the pane gives way first, then the card scrolls */
+        flex: 1 1 auto;
+        min-height: min(5rem, 20vh);
         overflow: hidden;
-        flex-grow: 1;
         display: flex;
 
         & .sr-content {
