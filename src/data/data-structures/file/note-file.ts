@@ -109,25 +109,36 @@ export class SRNoteTFile extends SRTFile implements ISRNoteTFile {
      */
     getQuestionContext(cardLine: number): string[] {
         const fileCachedData = this.metadataCache.getFileCache(this.file) || {};
-        const headings: HeadingCache[] = fileCachedData.headings || [];
-        const stack: HeadingCache[] = [];
-        for (const heading of headings) {
-            if (heading.position.start.line > cardLine) {
-                break;
-            }
-
-            while (stack.length > 0 && stack[stack.length - 1].level >= heading.level) {
-                stack.pop();
-            }
-
-            stack.push(heading);
-        }
-
-        const result = [];
-        for (const headingObj of stack) {
-            headingObj.heading = headingObj.heading.replace(/\[\^\d+\]/gm, "").trim();
-            result.push(headingObj.heading);
-        }
-        return result;
+        return questionContextFromHeadings(fileCachedData.headings || [], cardLine);
     }
+}
+
+/**
+ * The heading breadcrumb above a card's line. Only `#` headings count: a line followed by
+ * `---` is a setext heading to Markdown, but here `---` ends a card, so that "heading" is just
+ * the last line of the card before (with its schedule comment).
+ */
+export function questionContextFromHeadings(headings: HeadingCache[], cardLine: number): string[] {
+    const stack: HeadingCache[] = [];
+    for (const heading of headings) {
+        if (heading.position.start.line > cardLine) {
+            break;
+        }
+        if (heading.position.end.line > heading.position.start.line) {
+            continue;
+        }
+
+        while (stack.length > 0 && stack[stack.length - 1].level >= heading.level) {
+            stack.pop();
+        }
+
+        stack.push(heading);
+    }
+
+    const result = [];
+    for (const headingObj of stack) {
+        headingObj.heading = headingObj.heading.replace(/\[\^\d+\]/gm, "").trim();
+        result.push(headingObj.heading);
+    }
+    return result;
 }
