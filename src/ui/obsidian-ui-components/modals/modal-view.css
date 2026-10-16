@@ -9,6 +9,9 @@
 #sr-modal-view .sr-modal-content {
     overflow: visible;
     padding: 0;
+    /* Held to the window's height: the card inside takes its natural height (see
+       .sr-scroll-wrapper), which would otherwise stretch the window instead of scrolling */
+    min-height: 0;
 }
 
 #sr-modal-view .modal-close-button,

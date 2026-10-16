@@ -9,8 +9,8 @@ import {
 } from "src/ui/obsidian-ui-components/embedded-markdown-editor";
 import {
     CardCommentEntry,
-    clampNotesHeight,
     notesLinkLabel,
+    notesPaneMinHeight,
     parseCardCommentDefinition,
 } from "src/utils/card-comment";
 import EmulatedPlatform from "src/utils/platform-detector";
@@ -26,12 +26,12 @@ export interface CardCommentInput {
 
 // Per-device memory of whether the note box is shown (app.loadLocalStorage)
 const BOX_OPEN_KEY = "sr-card-comment-box-open";
-// Per-device height of the past notes list, set by dragging its grip (px; absent: the default)
-const NOTES_HEIGHT_KEY = "sr-card-comment-notes-height";
 // Overflow smaller than this is not scrolling: math hanging a few px below its line
 const OVERFLOW_SLACK = 6;
 // Past notes shown before "show N earlier notes"
 const VISIBLE_NOTES = 3;
+// Lines of notes the list keeps when the card needs the room
+const NOTES_FLOOR_LINES = 2.5;
 
 export default class CardCommentComponent {
     private app: App;
@@ -61,6 +61,8 @@ export default class CardCommentComponent {
     // "show N earlier notes" / "show fewer": see notesLinkLabel
     private moreLink: HTMLAnchorElement;
     private showAllNotes: boolean = false;
+    // Re-measures the pane when it or the list changes size (window, keyboard, a growing box)
+    private resizeObserver: ResizeObserver;
 
     public constructor(
         parentEl: HTMLElement,
@@ -86,7 +88,6 @@ export default class CardCommentComponent {
         // the notes and not the panel
         const pastPanel = this.container.createDiv();
         pastPanel.addClass("sr-card-comment-past-panel");
-        this.createResizeGrip(pastPanel);
         this.pastEntries = pastPanel.createDiv();
         this.pastEntries.addClass("sr-card-comment-past");
         this.pastEntries.addEventListener("scroll", () => this.updateScrollFades(), {
@@ -144,8 +145,10 @@ export default class CardCommentComponent {
             if (!this.inputEl.contains(e.relatedTarget as Node | null)) this.popSaveScope();
         });
         this.setOpen(this.app.loadLocalStorage(BOX_OPEN_KEY) !== false, false);
-        const savedHeight: unknown = this.app.loadLocalStorage(NOTES_HEIGHT_KEY);
-        if (typeof savedHeight === "number") this.setNotesHeight(savedHeight);
+
+        this.resizeObserver = new ResizeObserver(() => this.updateLayout());
+        this.resizeObserver.observe(this.container);
+        this.resizeObserver.observe(this.pastEntries);
     }
 
     private createTextarea(): HTMLTextAreaElement {
@@ -202,6 +205,7 @@ export default class CardCommentComponent {
     /** Removes the embedded editor from the plugin; call when the review view closes. */
     public destroy(): void {
         this.popSaveScope();
+        this.resizeObserver.disconnect();
         this.editor?.destroy();
         this.editor = null;
     }
@@ -239,6 +243,10 @@ export default class CardCommentComponent {
             ? parseCardCommentDefinition(cardCommentDefinition)
             : [];
 
+        this.container.toggleClass(
+            "is-clamping",
+            this.plugin.dataManager.data.settings.clampLongCardNotes,
+        );
         const wrapper = new RenderMarkdownWrapper(this.app, this.plugin, filePath);
         for (const [index, entry] of this.entries.entries()) {
             const row = this.pastEntries.createDiv();
@@ -251,6 +259,8 @@ export default class CardCommentComponent {
             const body = row.createDiv();
             body.addClass("sr-card-comment-text");
             await wrapper.renderMarkdownWrapper(entry.text, body, TextDirection.Unspecified);
+            // A long note cut to two lines (the setting) opens on a tap, and closes on another
+            body.addEventListener("click", (e: MouseEvent) => this.toggleClampedNote(body, e));
 
             // A quiet "edit" link: loads the entry into the box below; saved like a new comment
             const editLink = row.createEl("a", { text: t("CARD_NOTE_EDIT_LINK") });
@@ -266,7 +276,7 @@ export default class CardCommentComponent {
         // note in view at the bottom
         this.updateVisibleNotes();
         this.pastEntries.scrollTop = this.pastEntries.scrollHeight;
-        this.updateScrollFades();
+        this.updateLayout();
     }
 
     /** Opens the box if collapsed, without remembering that, and puts the cursor in it (N key). */
@@ -292,52 +302,50 @@ export default class CardCommentComponent {
         this.updateScrollFades();
     }
 
-    /**
-     * A grip on the panel's top edge: dragging it up makes the list taller, down shorter. The
-     * height is a cap, so a card with few notes still takes only their room. Remembered per
-     * device; a double click goes back to the default.
-     */
-    private createResizeGrip(panel: HTMLElement): void {
-        const grip: HTMLDivElement = panel.createDiv();
-        grip.addClass("sr-card-comment-grip");
-        grip.ariaLabel = t("CARD_NOTE_RESIZE");
-        let startY: number = 0;
-        let startHeight: number = 0;
-        let height: number | null = null;
-        grip.addEventListener("pointerdown", (e: PointerEvent) => {
-            e.preventDefault();
-            grip.setPointerCapture(e.pointerId);
-            startY = e.clientY;
-            startHeight = this.pastEntries.offsetHeight;
-            height = null;
-            panel.addClass("is-resizing");
-        });
-        grip.addEventListener("pointermove", (e: PointerEvent) => {
-            if (!grip.hasPointerCapture(e.pointerId)) return;
-            height = this.setNotesHeight(startHeight - (e.clientY - startY));
-        });
-        const end = (e: PointerEvent) => {
-            if (!grip.hasPointerCapture(e.pointerId)) return;
-            grip.releasePointerCapture(e.pointerId);
-            panel.removeClass("is-resizing");
-            if (height !== null) this.app.saveLocalStorage(NOTES_HEIGHT_KEY, height);
-        };
-        grip.addEventListener("pointerup", end);
-        grip.addEventListener("pointercancel", end);
-        grip.addEventListener("dblclick", () => {
-            this.pastEntries.style.removeProperty("--sr-notes-max");
-            this.app.saveLocalStorage(NOTES_HEIGHT_KEY, null);
-            this.updateScrollFades();
-        });
+    private toggleClampedNote(body: HTMLElement, e: MouseEvent): void {
+        const opening: boolean = body.hasClass("is-clamped");
+        if (!opening && !body.hasClass("is-open")) return;
+        // Links in the note still work, and selecting text does not toggle it
+        if ((e.target as HTMLElement).closest("a")) return;
+        if (!body.win.getSelection()?.isCollapsed) return;
+        body.toggleClass("is-open", opening);
+        this.updateLayout();
     }
 
-    /** Caps the list at `height` px (kept within bounds); returns the height applied. */
-    private setNotesHeight(height: number): number {
-        const win: Window = this.pastEntries.win ?? window;
-        const applied: number = clampNotesHeight(height, win.innerHeight);
-        this.pastEntries.setCssProps({ "--sr-notes-max": `${applied}px` });
+    /**
+     * Sizes the pane against the card. The view lays it out in a column under the card, both at
+     * their natural height; when they do not fit, the list of notes gives up its room first (it
+     * scrolls), down to about two and a half lines, and only then does the card scroll. So a
+     * short card leaves the notes all the room they need, and a long one never hides them.
+     */
+    private updateLayout(): void {
+        const list: HTMLDivElement = this.pastEntries;
+        if (this.container.hasClass("sr-is-hidden")) return;
+        const clamping: boolean = this.container.hasClass("is-clamping");
+        for (const body of Array.from(
+            list.querySelectorAll<HTMLElement>(".sr-card-comment-text"),
+        )) {
+            const cut: boolean =
+                clamping && !body.hasClass("is-open") && body.scrollHeight > body.clientHeight + 1;
+            body.toggleClass("is-clamped", cut);
+            if (!clamping) body.removeClass("is-open");
+        }
+
+        const style: CSSStyleDeclaration = list.win.getComputedStyle(list);
+        const lineHeight: number =
+            parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5 || 20;
+        const floor: number =
+            NOTES_FLOOR_LINES * lineHeight +
+            parseFloat(style.paddingTop || "0") +
+            parseFloat(style.paddingBottom || "0");
+        const minHeight: number = notesPaneMinHeight(
+            this.container.offsetHeight,
+            list.offsetHeight,
+            list.scrollHeight,
+            floor,
+        );
+        this.container.setCssProps({ "min-height": `${minHeight}px` });
         this.updateScrollFades();
-        return applied;
     }
 
     /**
@@ -350,7 +358,7 @@ export default class CardCommentComponent {
         this.showAllNotes = expanded;
         this.updateVisibleNotes();
         list.scrollTop = expanded ? list.scrollHeight - fromBottom : list.scrollHeight;
-        this.updateScrollFades();
+        this.updateLayout();
     }
 
     // Scrolls only when the notes are taller than the cap, with soft fades at the edges that

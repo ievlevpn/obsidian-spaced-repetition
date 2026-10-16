@@ -408,6 +408,19 @@ export class UIPreferencesPage extends SettingsPage {
                                 await this.settingsManager.save();
                             }),
                     );
+            })
+            .addSetting((setting: Setting) => {
+                setting
+                    .setName(t("CLAMP_CARD_NOTES"))
+                    .setDesc(t("CLAMP_CARD_NOTES_DESC"))
+                    .addToggle((toggle) =>
+                        toggle
+                            .setValue(this.settingsManager.settings.clampLongCardNotes)
+                            .onChange(async (value) => {
+                                this.settingsManager.settings.clampLongCardNotes = value;
+                                await this.settingsManager.save();
+                            }),
+                    );
             });
 
         new SettingGroup(this.containerEl)

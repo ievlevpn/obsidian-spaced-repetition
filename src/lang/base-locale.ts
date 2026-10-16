@@ -108,8 +108,9 @@ export interface IBaseLocale {
     CARD_NOTE_SHOW_EARLIER: string;
     CARD_NOTE_SHOW_EARLIER_ONE: string;
     CARD_NOTE_SHOW_FEWER: string;
-    CARD_NOTE_RESIZE: string;
     CARD_NOTE_EDITING: string;
+    CLAMP_CARD_NOTES: string;
+    CLAMP_CARD_NOTES_DESC: string;
     CARD_NOTE_EDITING_UNDATED: string;
     EDIT_CARD: string;
     RESET_CARD_PROGRESS: string;

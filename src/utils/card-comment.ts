@@ -227,21 +227,25 @@ export function notesLinkLabel(hidden: number, expanded: boolean): string | null
     return null;
 }
 
-// The notes list's height, set by dragging its grip: at least about one note, at most most of
-// the window, so the card and the rating buttons always keep some room
-export const NOTES_MIN_HEIGHT = 48;
-export const NOTES_MAX_FRACTION = 0.7;
-
 /**
- * The height a drag of the notes list's grip asks for, kept within bounds.
+ * The least height of the notes pane (the list of past notes and the box under it). The list
+ * gives up room to the card first, but keeps about two and a half lines of notes (all of them,
+ * when they are shorter); the rest of the pane (bar, box, links) never shrinks.
  *
- * @param height - Requested height (px)
- * @param windowHeight - The window's inner height (px)
- * @returns The height to apply (px, whole)
+ * @param paneHeight - The pane's current height (px)
+ * @param listHeight - The list's current height (px)
+ * @param listContentHeight - The height of all the list's notes, unclipped (px)
+ * @param listFloor - About two and a half lines of notes (px)
+ * @returns The pane's min-height (px, whole)
  */
-export function clampNotesHeight(height: number, windowHeight: number): number {
-    const max: number = Math.max(NOTES_MIN_HEIGHT, windowHeight * NOTES_MAX_FRACTION);
-    return Math.round(Math.min(max, Math.max(NOTES_MIN_HEIGHT, height)));
+export function notesPaneMinHeight(
+    paneHeight: number,
+    listHeight: number,
+    listContentHeight: number,
+    listFloor: number,
+): number {
+    const rest: number = Math.max(0, paneHeight - listHeight);
+    return Math.ceil(rest + Math.min(listFloor, listContentHeight));
 }
 
 /**

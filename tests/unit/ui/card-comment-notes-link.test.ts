@@ -1,9 +1,4 @@
-import {
-    clampNotesHeight,
-    NOTES_MAX_FRACTION,
-    NOTES_MIN_HEIGHT,
-    notesLinkLabel,
-} from "src/utils/card-comment";
+import { notesLinkLabel, notesPaneMinHeight } from "src/utils/card-comment";
 
 describe("notesLinkLabel", () => {
     test("no link when nothing is folded away", () => {
@@ -20,20 +15,17 @@ describe("notesLinkLabel", () => {
     });
 });
 
-describe("clampNotesHeight", () => {
-    test("keeps a height within bounds, rounded", () => {
-        expect(clampNotesHeight(200.4, 1000)).toBe(200);
+describe("notesPaneMinHeight", () => {
+    test("keeps the rest of the pane and a floor of notes", () => {
+        // pane 300 = list 200 + 100 of bar and box; notes 500 tall, floor 60
+        expect(notesPaneMinHeight(300, 200, 500, 60)).toBe(160);
     });
 
-    test("never smaller than about one note", () => {
-        expect(clampNotesHeight(-50, 1000)).toBe(NOTES_MIN_HEIGHT);
+    test("notes shorter than the floor keep all their room", () => {
+        expect(notesPaneMinHeight(140, 40, 40, 60)).toBe(140);
     });
 
-    test("never taller than most of the window", () => {
-        expect(clampNotesHeight(5000, 1000)).toBe(1000 * NOTES_MAX_FRACTION);
-    });
-
-    test("a tiny window still allows the minimum", () => {
-        expect(clampNotesHeight(100, 40)).toBe(NOTES_MIN_HEIGHT);
+    test("the same while the list is squeezed", () => {
+        expect(notesPaneMinHeight(130, 30, 500, 60.4)).toBe(161);
     });
 });
