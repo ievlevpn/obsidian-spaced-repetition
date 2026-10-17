@@ -183,7 +183,7 @@ export class FlashcardEditModal extends Modal {
             e.preventDefault();
             e.stopPropagation();
             this.cancel();
-        } else if (e.key === "Tab" && this.fieldBack !== null && !editorWantsTab()) {
+        } else if (e.key === "Tab" && this.fieldBack !== null && !editorWantsTab(e.shiftKey)) {
             e.preventDefault();
             e.stopPropagation();
             const inFront: boolean =
@@ -369,10 +369,11 @@ export class FlashcardEditModal extends Modal {
 }
 
 /**
- * Whether Tab belongs to the editor where the cursor is: on a list line (indent) or inside
- * math (Latex Suite's tabstops). Anywhere else it moves to the other field.
+ * Whether Tab (Shift-Tab if `shift`) belongs to the editor where the cursor is: on a list line
+ * it can indent (outdent), or inside math (Latex Suite's tabstops). Anywhere else it moves to
+ * the other field.
  */
-function editorWantsTab(): boolean {
+function editorWantsTab(shift: boolean): boolean {
     const selection: Selection | null = activeDocument.getSelection();
     const node: Node | null = selection?.anchorNode ?? null;
     const element: HTMLElement | null | undefined =
@@ -380,7 +381,17 @@ function editorWantsTab(): boolean {
     const line: HTMLElement | null | undefined = element?.closest(".cm-line");
     const content: HTMLElement | null | undefined = element?.closest(".cm-content");
     if (!line || !content || !selection || selection.rangeCount === 0) return false;
-    if (/^\s*([-*+]|\d+[.)])\s/.test(line.textContent ?? "")) return true;
+    // A list item takes Tab only when it can nest under the item above (a card's lone first
+    // item cannot, and Tab did nothing), and Shift-Tab only when it is nested already
+    const listItem = /^(\s*)([-*+]|\d+[.)])\s/;
+    const item: RegExpMatchArray | null = (line.textContent ?? "").match(listItem);
+    if (item) {
+        if (shift) return item[1].length > 0;
+        const above: Element | null = line.previousElementSibling;
+        if (above?.classList.contains("cm-line") && listItem.test(above.textContent ?? "")) {
+            return true;
+        }
+    }
     // Math shown as source is the math being edited (the rest is rendered, without its
     // dollars): an odd count of $$, or of $ on this line, before the cursor means inside it
     const upTo = (from: Node): string => {
